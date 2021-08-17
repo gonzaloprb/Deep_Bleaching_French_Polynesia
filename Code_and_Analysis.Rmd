@@ -36,7 +36,7 @@ require (betareg)
 
 rm (list=ls())
 
-
+ 
 sst_sat <- read.csv(file = "Data/SST_Bleaching/Temperature_Bleaching_2019.csv", header = T, dec = ".", sep = ";")
 
 colnames (sst_sat) [1] <- "Dates"
