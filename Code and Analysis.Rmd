@@ -14,7 +14,7 @@ library(brms); library (inline); library (stam); library (ggplot2); library (dpl
 require(scatterplot3d); require(reshape); require (reshape2); require(RColorBrewer)
 
 require (car)
-require (vegan) 
+require (vegan)
 require(glmm)
 require (nnet)
 require(MuMIn)
