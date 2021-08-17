@@ -2,7 +2,7 @@
 title: "Script_Coral_Bleaching_Analysis"
 author: "Gonzalo"
 date: "11/19/2020"
-output: "https://github.com/gonzaloprb/DEEP_Bleaching"
+output: "https://github.com/gonzaloprb/Deep_Bleaching_French_Polynesia"
   word_document: default
   pdf_document: default
   html_document: default
