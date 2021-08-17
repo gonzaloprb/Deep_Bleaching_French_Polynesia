@@ -757,7 +757,7 @@ ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Islands
 
 ```{r message=FALSE, warning=FALSE}
 # Clean workspace and Global Environment
-rm (list=ls())
+rm (list=ls()) 
 
 ##################### Temperature ##################### 
 
