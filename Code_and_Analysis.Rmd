@@ -1007,7 +1007,7 @@ plot <- ggplot(data=Index_temp, aes(y= Depth , x =Temperature, xmin = Min, xmax 
 plot
 ######## This is the good one #########
 
-write.csv(Index_temp, "Data/Temperature_Loggers/MAKATEA/MAK1/MAK1_Temp_Index.csv")
+write.csv(Index_temp, "Data/Temperature_Loggers/MAK1/MAK1_Temp_Index.csv")
 
 ggsave ( "Figures/Temp_Index_Mak.pdf", plot,width = 4.8, height = 4.5) 
 
