@@ -1672,7 +1672,7 @@ likelihood_plot <- ggplot(Profiles_vs_Likelihood, aes (Depth)) +
   scale_y_continuous(name ="Index (%)", limits=c(0,110), breaks = c(0,25,50,75,100)) +
   theme_classic() + theme(strip.background = element_blank())
 ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Likelihood_Temp_Light.pdf", width = 12, height = 6, units = "cm")
-likelihood_plot
+likelihood_plot 
 
 ```
 
