@@ -1361,6 +1361,7 @@ plot
 ######## This is the good one #########
 ggsave ( "Figures/Light_Index_Mak.pdf", plot,width = 4.8, height = 4.5)
   
+write.csv(Index_light, "Data/Light/Mak1/MAK1_Light_Index.csv")
 
 
 ```
