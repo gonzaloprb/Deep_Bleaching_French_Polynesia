@@ -49,7 +49,7 @@ sst_sat$Dates <- as.Date (sst_sat$Dates)
 ######################################3
 ### Moorea
 
-Moorea_Daily_Sat <- subset (sst_sat, select = c("Dates", "Moorea"))
+Moorea_Daily_Sat <- subset (sst_sat, select = c("Dates", "Moorea")) 
 names (Moorea_Daily_Sat) [2] <- "Temperature"
 Moorea_Daily_Sat$Temperature <- as.numeric (as.character(Moorea_Daily_Sat$Temperature))
 
