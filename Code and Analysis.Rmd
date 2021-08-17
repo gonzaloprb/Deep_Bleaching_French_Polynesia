@@ -36,7 +36,7 @@ require (betareg)
 
 rm (list=ls())
 
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/SST_Bleaching")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/SST_Bleaching")
 sst_sat <- read.csv(file = "Temperature_Bleaching_2019.csv", header = T, dec = ".", sep = ";")
 
 colnames (sst_sat) [1] <- "Dates"
@@ -384,7 +384,7 @@ Makatea_DHW_plot
 
 # Clean workspace and Global Environment
 
-dat <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Bleaching_Survey_Preliminary.csv", sep=";", dec=",")
+dat <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bleaching_Survey_Preliminary.csv", sep=";", dec=",")
 
 dat <- dat[dat$Size %in% c("Big", "Medium"),]
 dat <- dat[dat$Observations >0,]
@@ -420,8 +420,9 @@ nb_colonies_2 <- nb_colonies_2 %>% complete( Site,Depth,Quadrat,Size,fill = list
 nb_colonies_Site_Depth_Size <- ddply(nb_colonies_2, ~ Site + Depth  + Size, function(x){
   c(nb_colonies=mean(x$nb_colonies), nb_colonies_se=sd(x$nb_colonies) / sqrt(length(x$nb_colonies))) }) 
 
-# Install the necessary packages
-library("parallel"); library ("cmdstanr"); library (tidybayes)
+# Install the necessary packages - depends if working from server or personal computer
+library(parallel);  library (tidybayes) ; # library (cmdstanr)
+
 
 # Modelling formula. This takes a while, except if run from server. Otherwise, load directly the output of the model. 
 # If run from personal computer, remove "backend" and "threads"
@@ -434,7 +435,7 @@ library("parallel"); library ("cmdstanr"); library (tidybayes)
 
 
 # Load the output of the model straight
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian")
 load("fit_brms_Bleaching.RData") 
 
 # Check output of the model 
@@ -468,7 +469,7 @@ ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figure
 
 # Posterior predicted distribution
 # Load the output of the model - if haven't executed or done it
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian")
 load("fit_brms_Bleaching.RData") 
 
 # Create the reference dataframe - newdata (Here for all depths)
@@ -501,7 +502,7 @@ ref_data_fitted <- melt (ref_data_fitted, id.vars = c ("Depth", "Genus", "Site")
 
 
 ####### Check the depth ranges and number of replicates of genera ####### 
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data")
 deep_bleaching <- read.csv(file = "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bleaching_Survey_Preliminary.csv", header = T, dec = ".", sep = ";")
 
 keep_size <-  c ("Big", "Medium") # do not run for the test of bleaching according to size
@@ -631,7 +632,7 @@ ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figure
 
 
 # Conditional effects per genera
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian")
 load("fit_brms_Bleaching.RData")  
 
 # Only for genus 
@@ -641,7 +642,7 @@ conditions <- make_conditions(fit_2, vars = c( "Genus"))
 # save(ce_Genus, file="ce_Genus.RData")
 
 # Load the output from the conditional effects above
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian")
 load("ce_Genus.RData")
 
 # Finally, I got the test as I wanted
@@ -677,8 +678,7 @@ ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figure
 # Clean workspace and Global Environment
 rm (list=ls())
 
-
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data")
 deep_bleaching <- read.csv(file = "Bleaching_Survey_Preliminary.csv", header = T, dec = ".", sep = ";")
 
 
@@ -766,7 +766,7 @@ rm (list=ls())
 ### 1st Moorea
 
 # Choose directory where you have CSV and function reading
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MOO1")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Temperature_Loggers/MOO1")
 
 # Introduce filenames of the folder between " " .
 # Very importanct to put them in same order than prof
@@ -892,8 +892,7 @@ ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Temp_
 
 
 # Choose directory where you have CSV and function reading
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1")
-
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Temperature_Loggers/MAK1")
 # Introduce filenames of the folder between " " .
 # Very importanct to put them in same order than prof
 
@@ -1029,7 +1028,7 @@ ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Temp_
 
 ### For Moorea
 # Choose directory where you have CSV and function reading
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Moo1")
 
 # Introduce filenames of the folder between " " 
 file.names = c("MO1-20-light.csv","MO1-40-light.csv","MO1-60-light.csv","MO1-90-light.csv","MO1-120-light.csv")
@@ -1156,7 +1155,7 @@ for(i in unique(lambert_light_Final$Time)){
 
 # Index loss using Beer Lambert Equation
 
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Moo1")
 Index_light <- read.csv(file = "Light_Lambert_MOO1.csv", header = T, dec = ".", sep = ";")
 
 Index_light <- subset(Index_light, Time < "16:00:00" & Time > "09:00:00")
@@ -1218,7 +1217,7 @@ ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Light
 
 ### For Makatea 
 # Choose directory where you have CSV and function reading
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Mak1")
 
 
 # Introduce filenames of the folder between " " 
@@ -1330,7 +1329,7 @@ for(i in unique(lambert_light_Final$Time)){
 
 # Index loss using Beer Lambert Equation
 
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1")
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Mak1")
 Index_light <- read.csv(file = "Light_Lambert_MAK1.csv", header = T, dec = ".", sep = ";")
 
 Index_light <- subset(Index_light, Time < "16:00:00" & Time > "09:00:00")
@@ -1396,18 +1395,18 @@ Fig. S3
 # Clean workspace and Global Environment
 rm (list=ls())
 # Loggers Temp
-Index_Temp_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MOO1/MOO1_Temp_Index.csv", sep=",", dec=",")
-Index_Temp_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1/MAK1_Temp_Index.csv", sep=",", dec=",")
+Index_Temp_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Temperature_Loggers/MOO1/MOO1_Temp_Index.csv", sep=",", dec=",")
+Index_Temp_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Temperature_Loggers/MAK1/MAK1_Temp_Index.csv", sep=",", dec=",")
 
 # Loggers light
-Index_Light_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1/MOO1_Light_Index.csv", sep=",", dec=",")
-Index_Light_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1/MAK1_Light_Index.csv", sep=",", dec=",")
+Index_Light_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Moo1/MOO1_Light_Index.csv", sep=",", dec=",")
+Index_Light_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Mak1/MAK1_Light_Index.csv", sep=",", dec=",")
 
 # CTD Makatea 
-CTD_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/CTD/MAKATEA/normalize_PAR.csv", sep=",", dec=",")
-PAR_final_six <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/CTD/MAKATEA/Makatea_PAR_final_six.csv", sep=",", dec=",")
+CTD_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/CTD/Makatea/normalize_PAR.csv", sep=",", dec=",")
+PAR_final_six <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/CTD/Makatea/Makatea_PAR_final_six.csv", sep=",", dec=",")
 
-Temp_final_six <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/CTD/MAKATEA/Makatea_Temp_final_six.csv", sep=",", dec=",")
+Temp_final_six <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/CTD/Makatea/Makatea_Temp_final_six.csv", sep=",", dec=",")
 
 
 ################## 1 CTD with loggers profiles ################## 
@@ -1494,8 +1493,8 @@ rm (list=ls())
 
 # Differences of site and likelihood of being healthy per site
 
-setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
-load("fit_brms_2.RData") 
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian")
+load("fit_brms_Bleaching.RData") 
 
 # Only the differences for site
 conditions <- make_conditions(fit_2, vars = c( "Site"))
@@ -1505,6 +1504,7 @@ conditions <- make_conditions(fit_2, vars = c( "Site"))
 
 
 # Load the output from the conditional effects above
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian")
 load("ce_Site.RData")
 
 
@@ -1547,9 +1547,9 @@ write.csv(Healthy_Likelihood_Makatea, "~/Documents/AAASea_Science/AAA_PhD_Thesis
 ### Reload dataframes - and all environmental data
 
 # Likelihood healthy
-Healhty_Likelihood_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood_Moorea.csv", sep=",", dec=",")
-Healhty_Likelihood_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood_Makatea.csv", sep=",", dec=",")
-Healthy_Likelihood <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood.csv", sep=",", dec=",")
+Healhty_Likelihood_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian/Healthy_Likelihood_Moorea.csv", sep=",", dec=",")
+Healhty_Likelihood_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian/Healthy_Likelihood_Makatea.csv", sep=",", dec=",")
+Healthy_Likelihood <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Bayesian/Healthy_Likelihood.csv", sep=",", dec=",")
 
 
 
@@ -1558,8 +1558,8 @@ Index_Temp_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleachi
 Index_Temp_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1/MAK1_Temp_Index.csv", sep=",", dec=",")
 
 # Loggers light
-Index_Light_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1/MOO1_Light_Index.csv", sep=",", dec=",")
-Index_Light_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1/MAK1_Light_Index.csv", sep=",", dec=",")
+Index_Light_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Moo1/MOO1_Light_Index.csv", sep=",", dec=",")
+Index_Light_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Deep_Bleaching_French_Polynesia/Data/Light/Mak1/MAK1_Light_Index.csv", sep=",", dec=",")
 
 
 ################## 2 Likelihood healthy vs Temp and Light   ################## 
