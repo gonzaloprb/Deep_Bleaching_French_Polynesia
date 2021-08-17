@@ -383,6 +383,7 @@ Makatea_DHW_plot
 ```{r message=FALSE, warning=FALSE}
 
 # Clean workspace and Global Environment
+rm (list=ls())
 
 dat <- read.csv("Data/Bleaching_Survey_Preliminary.csv", sep=";", dec=",")
 
