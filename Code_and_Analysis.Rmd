@@ -11,7 +11,7 @@ output: "https://github.com/gonzaloprb/Deep_Bleaching_French_Polynesia"
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 library(brms); library (inline); library (stam); library (ggplot2); library (dplyr); library (plyr);library(tidyr); library (tidyverse); library (ggridges); library (hrbrthemes); library (viridis); library(stringr); library (data.table); library(timeSeries); library(scales);  library (sos); library (gridExtra); library (cowplot); library (hms)
 
-require(scatterplot3d); require(reshape); require (reshape2); require(RColorBrewer)
+require(scatterplot3d); require(reshape); require (reshape2); require(RColorBrewer) 
 
 require (car)
 require (vegan)
