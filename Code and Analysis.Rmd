@@ -1,0 +1,1679 @@
+---
+title: "Script_Coral_Bleaching_Analysis"
+author: "Gonzalo"
+date: "11/19/2020"
+output: "https://github.com/gonzaloprb/DEEP_Bleaching"
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(brms); library (inline); library (stam); library (ggplot2); library (dplyr); library (plyr);library(tidyr); library (tidyverse); library (ggridges); library (hrbrthemes); library (viridis); library(stringr); library (data.table); library(timeSeries); library(scales);  library (sos); library (gridExtra); library (cowplot); library (hms)
+
+require(scatterplot3d); require(reshape); require (reshape2); require(RColorBrewer)
+
+require (car)
+require (vegan) 
+require(glmm)
+require (nnet)
+require(MuMIn)
+require (betareg)
+require (lme4)
+require (MASS)
+require (betareg)
+
+```
+# Fig 1A - Illustrations of photoquadrats
+
+## Environmental data - Degree Heating Weeks 
+# For the two islands separately - Moorea and Makatea
+
+# Fig 1B
+
+
+```{r message=FALSE, warning=FALSE}
+
+rm (list=ls())
+
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/SST_Bleaching")
+sst_sat <- read.csv(file = "Temperature_Bleaching_2019.csv", header = T, dec = ".", sep = ";")
+
+colnames (sst_sat) [1] <- "Dates"
+sst_sat <- sst_sat[order(as.Date(sst_sat$Dates, format="%d/%m/%Y")),]
+sst_sat$Dates <- as.Date(sst_sat$Dates, "%d/%m/%Y")
+
+sst_sat$Dates <- as.Date (sst_sat$Dates)
+
+# Generate the DHW graphs and information by site. 
+######################################3
+### Moorea
+
+Moorea_Daily_Sat <- subset (sst_sat, select = c("Dates", "Moorea"))
+names (Moorea_Daily_Sat) [2] <- "Temperature"
+Moorea_Daily_Sat$Temperature <- as.numeric (as.character(Moorea_Daily_Sat$Temperature))
+
+# Generate weekly temperature by 7 days
+Moorea_Temp_Sat <- aggregate(Temperature ~ cut(Dates, "7 days"), Moorea_Daily_Sat, FUN = (mean)) # To get the weekly mean
+
+Moorea_Temp_Sat <- Moorea_Daily_Sat
+
+
+names (Moorea_Temp_Sat) [1] <- "Date"
+
+# Separate Year, Month and Day
+Moorea_Temp_Sat$Year <- substring(Moorea_Temp_Sat$Date,1,4)
+Moorea_Temp_Sat$Month <- substring(Moorea_Temp_Sat$Date,6,7)
+Moorea_Temp_Sat$Day <- substring(Moorea_Temp_Sat$Date,9,10)
+
+# Put date in the right format
+Moorea_Temp_Sat$Date <- with(Moorea_Temp_Sat, paste(Day,Month,Year, sep = "/"))
+
+# Change the name to make them match, later it's used
+Temp_Moorea <- Moorea_Temp_Sat
+
+# Calculate bleaching temperature with Monthly Max Mean (From daily temperature)
+Moorea_Bleaching_Temp <- Moorea_Daily_Sat
+Moorea_Bleaching_Temp <- subset (Moorea_Bleaching_Temp, Dates < as.Date ("1993-12-31"))
+# Only until 1993 Delete 1991 and 1992 because of Pinatubo
+Moorea_Bleaching_Temp <- Moorea_Bleaching_Temp[format(Moorea_Bleaching_Temp$Dates,'%Y') != c("1991"), ]
+Moorea_Bleaching_Temp <- Moorea_Bleaching_Temp[format(Moorea_Bleaching_Temp$Dates,'%Y') != c("1992"), ]
+
+
+Moorea_Bleaching_Temp$Month <- substring(Moorea_Bleaching_Temp$Date,6,7)
+Moorea_Bleaching_Temp <- aggregate (Moorea_Bleaching_Temp$Temperature ~ Moorea_Bleaching_Temp$Month, Moorea_Bleaching_Temp, mean)
+colnames(Moorea_Bleaching_Temp)=c( "Month", "mean_temp")
+Moorea_Bleaching_Temp[which.max(Moorea_Bleaching_Temp$mean_temp),]
+MMM_Bleaching_Moorea <- max (Moorea_Bleaching_Temp$mean_temp) # To this, necessary to add 1 degree
+BLT_Moorea=round(MMM_Bleaching_Moorea+1,1)
+###
+
+Temp_Moorea <- Temp_Moorea[order(as.Date(Temp_Moorea$Date, format="%d/%m/%Y")),]
+Temp_Moorea$Date <- as.Date(Temp_Moorea$Date, "%d/%m/%Y")
+
+# Add column of Monthly Maximum Mean and BLT. 
+Temp_Moorea$MMM_Bleaching <- MMM_Bleaching_Moorea 
+Temp_Moorea$BLT <- BLT_Moorea
+
+# Then we calculate difference of weekly temperature with MMM and BLT
+Temp_Moorea$diff_MMM <- Temp_Moorea$Temperature - Temp_Moorea$MMM_Bleaching
+Temp_Moorea$diff_BLT <- Temp_Moorea$Temperature - Temp_Moorea$BLT
+
+
+# Calculate the degree heating weeek
+Moorea_DHW <- Temp_Moorea[Temp_Moorea$diff_MMM >1,]   # We only keep higher values than 1 (BLT = MMM + 1).  Liu 2013, 2006, Eakin 2010, Glyn 1996 etc. 
+
+Moorea_DHW <- aggregate(diff_MMM ~ cut(Date, "7 days"), Moorea_DHW, FUN = (sum)) # Adding the daily excess heat, divide by 7
+colnames (Moorea_DHW)=c("Date", "DHW")
+Moorea_DHW$DHW <- Moorea_DHW$DHW/7
+Moorea_DHW$Date <- as.Date(Moorea_DHW$Date, "%Y-%m-%d")
+
+DHWs_Moorea <- aggregate(DHW ~ cut(Date, "1 year"), Moorea_DHW, FUN = (sum)) # It' is accumulated for its 12 precedent weeks (84 days), from the last value
+colnames (DHWs_Moorea)=c("Date", "DHW")
+DHWs_Moorea 
+
+Moorea_Daily_Sat_above <- Moorea_Daily_Sat
+Moorea_Daily_Sat_above$BLT <- BLT_Moorea
+Moorea_Daily_Sat_above$diff_BLT <- Moorea_Daily_Sat_above$Temperature - Moorea_Daily_Sat_above$BLT
+Moorea_Daily_Sat_above <- Moorea_Daily_Sat_above[Moorea_Daily_Sat_above$diff_BLT >0,]
+
+Moorea_Daily_Sat_above <- Moorea_Daily_Sat_above[order(as.Date(Moorea_Daily_Sat_above$Dates, format="%d/%m/%Y")),]
+Moorea_Daily_Sat_above$Dates <- as.Date(Moorea_Daily_Sat_above$Dates, "%d/%m/%Y")
+
+nrow(subset(Moorea_Daily_Sat_above, Dates > "2019-01-01" ))
+
+
+Bleaching_Year_Moorea <- c(substring (DHWs_Moorea$Date,1,4))
+DHWs_Moorea = cbind(DHWs_Moorea, Bleaching_Year_Moorea)
+
+# Add the levels that later will be necessary 
+DHWs_Moorea$Bleaching_Year_Moorea <- factor(DHWs_Moorea$Bleaching_Year_Moorea, levels = DHWs_Moorea$Bleaching_Year_Moorea)
+
+# Necessary to calculate mean for every month and year
+Moorea_month <- aggregate(Temperature ~ Year + Month, data = Temp_Moorea, mean)
+
+# Make a complete database
+Final_Temp_Moorea <- merge(Temp_Moorea, Moorea_month, by=c("Year","Month"))
+
+colnames (Final_Temp_Moorea)=c("Year", "Month", "Date", "Mean_temp", "Day", "MMM_Bleaching", "BLT", "diff_MMM", "diff_BLT", "Mean_temp_month_year")
+Final_Temp_Moorea <-  Final_Temp_Moorea [c("Date", "Year", "Month", "Day",  "Mean_temp",  "Mean_temp_month_year", "MMM_Bleaching", "BLT", "diff_MMM", "diff_BLT")]
+
+
+# Check and update the information of Bleaching_Year_Moorea
+# Check information of DHWs_Moorea$Date
+# These two following graphs are long-term sst
+
+Moorea_DHW_plot <- ggplot(data=DHWs_Moorea, aes(x=Bleaching_Year_Moorea, y=DHW, fill = Bleaching_Year_Moorea)) + 
+  geom_bar(stat="identity", width=0.5, fill = "salmon") +
+  theme(axis.text.x = element_text(angle = 0,  size = 9, hjust = 0.5))+
+  scale_y_continuous(breaks=seq(0,14,2))+ylab("DHWs (ºC·wks)")+ xlab("Bleaching events") 
+Moorea_DHW_plot <- Moorea_DHW_plot + theme(legend.position="none")+ggtitle("") +geom_text(aes(label=round(DHW, 1)), vjust=-1, color="black", size=3.5) + ylim(0,6)
+
+
+# New graph for figure 1. Plot in time where DHWs week goes above the average
+# View (Moorea_Temp_Sat)
+
+Moorea_Temp_2019 <- subset (Moorea_Daily_Sat, Dates > as.Date ("2019-01-01"))
+Moorea_Temp_2019 <- subset (Moorea_Temp_2019, Dates < as.Date ("2019-07-01"))
+Moorea_Temp_2019$BLT <- BLT_Moorea
+
+temp_2019_Moorea <- ggplot() + 
+  geom_line(data=Moorea_Temp_2019,aes(x=Dates, y=Temperature), size = 0.4)+ 
+  geom_line(data=Moorea_Temp_2019, aes (x=Dates, y=BLT_Moorea), size = 1, colour = "red", linetype="dotted") + 
+  scale_x_date(breaks = seq(as.Date("2019-01-01"), as.Date("2019-07-01"), by="1 months"), date_labels = "%b") +
+  ylab("Temp (ºC)")+ xlab("") + annotate("text", label=paste("BT = ",BLT_Moorea, "°C"),x=as.Date("2019-02-01"), y=BLT_Moorea + 0.05,size=6, colour="red")+ theme(text = element_text(size=20))
+
+
+# Plot for the weekly temperatures
+# Generate weekly temperature by 7 days
+Moorea_Temp_Sat <- aggregate(Temperature ~ cut(Dates, "7 days"), Moorea_Daily_Sat, FUN = (mean)) # To get the weekly mean
+names (Moorea_Temp_Sat) [1] <- "Date"
+# Separate Year, Month and Day
+Moorea_Temp_Sat$Year <- substring(Moorea_Temp_Sat$Date,1,4)
+Moorea_Temp_Sat$Month <- substring(Moorea_Temp_Sat$Date,6,7)
+Moorea_Temp_Sat$Day <- substring(Moorea_Temp_Sat$Date,9,10)
+# Put date in the right format
+Moorea_Temp_Sat$Date <- with(Moorea_Temp_Sat, paste(Day,Month,Year, sep = "/"))
+
+
+Moorea_w_Temp_2019 <- Moorea_Temp_Sat
+Moorea_w_Temp_2019$Date <- as.Date(Moorea_w_Temp_2019$Date, format = "%d/%m/%Y")
+Moorea_w_Temp_2019 <- subset ( Moorea_w_Temp_2019, Date > as.Date ("2019-01-01"))
+Moorea_w_Temp_2019 <- subset (Moorea_w_Temp_2019, Date < as.Date ("2019-06-01"))
+Moorea_w_Temp_2019$BLT <- BLT_Moorea
+
+temp_2019_Moorea_weekly <- ggplot() +
+  geom_line(data=Moorea_w_Temp_2019,aes(x=Date, y=Temperature), size = 0.4)+
+  geom_line(data=Moorea_w_Temp_2019, aes (x=Date, y=BLT_Moorea), size = 1, colour = "red", linetype="dotted") +
+  scale_x_date(breaks = seq(as.Date("2019-01-01"), as.Date("2019-06-01"), by="1 months"), date_labels = "%b") + ylim (28.6,30.2)+
+  ylab("Temperature (ºC)")+ xlab("") + annotate("text", label=paste("BT = ",BLT_Moorea, "°C"),x=as.Date("2019-02-01"), y=BLT_Moorea + 0.05,size=6, colour="red") +
+  theme(text = element_text(size=20),axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+temp_2019_Moorea_weekly
+
+
+# Develop of DHWs
+Moorea_DHW$Date <- as.Date(Moorea_DHW$Date, format = "%Y/%m/%d")
+Moorea_DHW <- subset ( Moorea_DHW, Date > as.Date ("2019-01-01"))
+Moorea_DHW <- subset (Moorea_DHW, Date < as.Date ("2019-06-01"))
+
+Moorea_DHW_plot <- ggplot() +
+  geom_bar (data=Moorea_DHW, aes(x=Date, y=DHW, fill = DHW), stat="identity", width=6, fill = "salmon") + 
+  theme(axis.text.x = element_text(angle = 0,  size = 12, hjust = 0))+
+  ylab("DHWs (ºC·wks)")+ xlab("Bleaching 2019") + ylim (c(0.0,1.5))+
+  theme(text = element_text(size=20),axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+Moorea_DHW_plot
+
+#########################################3
+### Makatea
+
+Makatea_Daily_Sat <- subset (sst_sat, select = c("Dates", "Makatea"))
+names (Makatea_Daily_Sat) [2] <- "Temperature"
+Makatea_Daily_Sat$Temperature <- as.numeric (as.character(Makatea_Daily_Sat$Temperature))
+
+# Makatea_Temp_Sat <- subset (sst_sat, select = c("Dates", "Makatea"))
+# names (Makatea_Temp_Sat) [2] <- "Temperature"
+
+# Generate weekly temperature by 7 days
+Makatea_Temp_Sat <- aggregate(Temperature ~ cut(Dates, "7 days"), Makatea_Daily_Sat, FUN = (mean)) # To get the weekly mean
+
+##### Greg Torda method #####
+Makatea_Temp_Sat <- Makatea_Daily_Sat
+##### Greg Torda method #####
+
+names (Makatea_Temp_Sat) [1] <- "Date"
+
+# Separate Year, Month and Day
+Makatea_Temp_Sat$Year <- substring(Makatea_Temp_Sat$Date,1,4)
+Makatea_Temp_Sat$Month <- substring(Makatea_Temp_Sat$Date,6,7)
+Makatea_Temp_Sat$Day <- substring(Makatea_Temp_Sat$Date,9,10)
+
+# Put date in the right format
+Makatea_Temp_Sat$Date <- with(Makatea_Temp_Sat, paste(Day,Month,Year, sep = "/"))
+
+# Change the name to make them match, later it's used
+Temp_Makatea <- Makatea_Temp_Sat
+
+# Calculate bleaching temperature with Monthly Max Mean (From daily temperature)
+Makatea_Bleaching_Temp <- Makatea_Daily_Sat
+Makatea_Bleaching_Temp <- subset (Makatea_Bleaching_Temp, Dates < as.Date ("1993-12-31"))
+# Only until 1993 Delete 1991 and 1992 because of Pinatubo
+Makatea_Bleaching_Temp <- Makatea_Bleaching_Temp[format(Makatea_Bleaching_Temp$Dates,'%Y') != c("1991"), ]
+Makatea_Bleaching_Temp <- Makatea_Bleaching_Temp[format(Makatea_Bleaching_Temp$Dates,'%Y') != c("1992"), ]
+
+
+Makatea_Bleaching_Temp$Month <- substring(Makatea_Bleaching_Temp$Date,6,7)
+Makatea_Bleaching_Temp <- aggregate (Makatea_Bleaching_Temp$Temperature ~ Makatea_Bleaching_Temp$Month, Makatea_Bleaching_Temp, mean)
+colnames(Makatea_Bleaching_Temp)=c( "Month", "mean_temp")
+Makatea_Bleaching_Temp[which.max(Makatea_Bleaching_Temp$mean_temp),]
+MMM_Bleaching_Makatea <- max (Makatea_Bleaching_Temp$mean_temp) # To this, necessary to add 1 degree
+BLT_Makatea=round(MMM_Bleaching_Makatea+1,1)
+###
+
+Temp_Makatea <- Temp_Makatea[order(as.Date(Temp_Makatea$Date, format="%d/%m/%Y")),]
+Temp_Makatea$Date <- as.Date(Temp_Makatea$Date, "%d/%m/%Y")
+
+# Add column of Monthly Maximum Mean and BLT. 
+Temp_Makatea$MMM_Bleaching <- MMM_Bleaching_Makatea 
+Temp_Makatea$BLT <- BLT_Makatea
+
+# Then we calculate difference of weekly temperature with MMM and BLT
+Temp_Makatea$diff_MMM <- Temp_Makatea$Temperature - Temp_Makatea$MMM_Bleaching
+Temp_Makatea$diff_BLT <- Temp_Makatea$Temperature - Temp_Makatea$BLT
+
+
+# Calculate the degree heating weeek
+Makatea_DHW <- Temp_Makatea[Temp_Makatea$diff_MMM >1,]   # We only keep higher values than 1 (BLT = MMM + 1).  Liu 2013, 2006, Eakin 2010, Glyn 1996 etc. 
+
+
+
+Makatea_DHW <- aggregate(diff_MMM ~ cut(Date, "7 days"), Makatea_DHW, FUN = (sum)) # Adding the daily excess heat, divide by 7
+colnames (Makatea_DHW)=c("Date", "DHW")
+Makatea_DHW$DHW <- Makatea_DHW$DHW/7
+Makatea_DHW$Date <- as.Date(Makatea_DHW$Date, "%Y-%m-%d")
+
+
+
+DHWs_Makatea <- aggregate(DHW ~ cut(Date, "1 year"), Makatea_DHW, FUN = (sum)) # It' is accumulated for its 12 precedent weeks (84 days), from the last value
+colnames (DHWs_Makatea)=c("Date", "DHW")
+ 
+
+
+Makatea_Daily_Sat_above <- Makatea_Daily_Sat
+Makatea_Daily_Sat_above$BLT <- BLT_Makatea
+Makatea_Daily_Sat_above$diff_BLT <- Makatea_Daily_Sat_above$Temperature - Makatea_Daily_Sat_above$BLT
+Makatea_Daily_Sat_above <- Makatea_Daily_Sat_above[Makatea_Daily_Sat_above$diff_BLT >0,]
+
+Makatea_Daily_Sat_above <- Makatea_Daily_Sat_above[order(as.Date(Makatea_Daily_Sat_above$Dates, format="%d/%m/%Y")),]
+Makatea_Daily_Sat_above$Dates <- as.Date(Makatea_Daily_Sat_above$Dates, "%d/%m/%Y")
+
+nrow(subset(Makatea_Daily_Sat_above, Dates > "2019-01-01" ))
+
+
+# It adds information of the year and month of the event "2016-04"
+
+Bleaching_Year_Makatea <- c(substring (DHWs_Makatea$Date,1,4))
+DHWs_Makatea = cbind(DHWs_Makatea, Bleaching_Year_Makatea)
+
+# Add the levels that later will be necessary 
+DHWs_Makatea$Bleaching_Year_Makatea <- factor(DHWs_Makatea$Bleaching_Year_Makatea, levels = DHWs_Makatea$Bleaching_Year_Makatea)
+
+# Necessary to calculate mean for every month and year
+Makatea_month <- aggregate(Temperature ~ Year + Month, data = Temp_Makatea, mean)
+
+# Make a complete database
+Final_Temp_Makatea <- merge(Temp_Makatea, Makatea_month, by=c("Year","Month"))
+
+colnames (Final_Temp_Makatea)=c("Year", "Month", "Date", "Mean_temp", "Day", "MMM_Bleaching", "BLT", "diff_MMM", "diff_BLT", "Mean_temp_month_year")
+Final_Temp_Makatea <-  Final_Temp_Makatea [c("Date", "Year", "Month", "Day",  "Mean_temp",  "Mean_temp_month_year", "MMM_Bleaching", "BLT", "diff_MMM", "diff_BLT")]
+
+
+# Check and update the information of Bleaching_Year_Makatea
+# Check information of DHWs_Makatea$Date
+# These two following graphs are long-term sst
+
+Makatea_DHW_plot <- ggplot(data=DHWs_Makatea, aes(x=Bleaching_Year_Makatea, y=DHW, fill = Bleaching_Year_Makatea)) + 
+  geom_bar(stat="identity", width=0.5, fill = "salmon") +
+  theme(axis.text.x = element_text(angle = 0,  size = 9, hjust = 0.5))+
+  scale_y_continuous(breaks=seq(0,14,2))+ylab("DHWs (ºC·wks)")+ xlab("Bleaching events") 
+Makatea_DHW_plot <- Makatea_DHW_plot + theme(legend.position="none")+ggtitle("") +geom_text(aes(label=round(DHW, 1)), vjust=-1, color="black", size=3.5) + ylim(0,6)
+
+
+Makatea_Temp_2019 <- subset (Makatea_Daily_Sat, Dates > as.Date ("2019-01-01"))
+Makatea_Temp_2019 <- subset (Makatea_Temp_2019, Dates < as.Date ("2019-06-01"))
+Makatea_Temp_2019$BLT <- BLT_Makatea
+
+temp_2019_Makatea <- ggplot() + 
+  geom_line(data=Makatea_Temp_2019,aes(x=Dates, y=Temperature), size = 0.4)+ 
+  geom_line(data=Makatea_Temp_2019, aes (x=Dates, y=BLT_Makatea), size = 1, colour = "red", linetype="dotted") + 
+  scale_x_date(breaks = seq(as.Date("2019-01-01"), as.Date("2019-06-01"), by="1 months"), date_labels = "%b") +
+  ylab("Temp (ºC)")+ xlab("") + annotate("text", label=paste("BT = ",BLT_Makatea, "°C"),x=as.Date("2019-02-01"), y=BLT_Makatea + 0.05,size=6, colour="red")+  theme(text = element_text( size = 20))
+
+
+# For the weekly temperatures
+# Generate weekly temperature by 7 days
+Makatea_Temp_Sat <- aggregate(Temperature ~ cut(Dates, "7 days"), Makatea_Daily_Sat, FUN = (mean)) # To get the weekly mean
+names (Makatea_Temp_Sat) [1] <- "Date"
+# Separate Year, Month and Day
+Makatea_Temp_Sat$Year <- substring(Makatea_Temp_Sat$Date,1,4)
+Makatea_Temp_Sat$Month <- substring(Makatea_Temp_Sat$Date,6,7)
+Makatea_Temp_Sat$Day <- substring(Makatea_Temp_Sat$Date,9,10)
+# Put date in the right format
+Makatea_Temp_Sat$Date <- with(Makatea_Temp_Sat, paste(Day,Month,Year, sep = "/"))
+
+
+Makatea_w_Temp_2019 <- Makatea_Temp_Sat
+Makatea_w_Temp_2019$Date <- as.Date(Makatea_w_Temp_2019$Date, format = "%d/%m/%Y")
+Makatea_w_Temp_2019 <- subset ( Makatea_w_Temp_2019, Date > as.Date ("2019-01-01"))
+Makatea_w_Temp_2019 <- subset (Makatea_w_Temp_2019, Date < as.Date ("2019-06-01"))
+Makatea_w_Temp_2019$BLT <- BLT_Makatea
+
+temp_2019_Makatea_weekly <- ggplot() +
+  geom_line(data=Makatea_w_Temp_2019,aes(x=Date, y=Temperature), size = 0.4)+
+  geom_line(data=Makatea_w_Temp_2019, aes (x=Date, y=BLT_Makatea), size = 1, colour = "red", linetype="dotted") +
+  scale_x_date(breaks = seq(as.Date("2019-01-01"), as.Date("2019-06-01"), by="1 months"), date_labels = "%b") + ylim (28.6,30.2)+
+  ylab("Temperature (ºC)")+ xlab("") + annotate("text", label=paste("BT = ",BLT_Makatea, "°C"),x=as.Date("2019-02-01"), y=BLT_Makatea + 0.05,size=6, colour="red")+ 
+  theme(text = element_text(size=20),axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+temp_2019_Makatea_weekly
+
+
+# Develop of DHWs
+Makatea_DHW$Date <- as.Date(Makatea_DHW$Date, format = "%Y/%m/%d")
+Makatea_DHW <- subset ( Makatea_DHW, Date > as.Date ("2019-01-01"))
+Makatea_DHW <- subset (Makatea_DHW, Date < as.Date ("2019-06-01"))
+
+
+Makatea_DHW_plot <- ggplot() +
+  geom_bar (data=Makatea_DHW, aes(x=Date, y=DHW, fill = DHW), stat="identity", width=6, fill = "salmon") + 
+  theme(axis.text.x = element_text(angle = 0,  size = 12, hjust = 0))+
+  ylab("DHWs (ºC·wks)")+ xlab("Bleaching 2019") + ylim (c(0.0,1.5))+
+  theme(text = element_text(size=20),axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+Makatea_DHW_plot
+
+
+```
+
+## Bayesian Modelling Stats
+
+# Model
+# Conditional Effects (Fig. 1 C)
+# Posterior predicted distribution at depth range  (Fig. 2 A)
+# Conditional Effects per genera  (Fig. 2 B)
+# Diference by site
+
+```{r message=FALSE, warning=FALSE}
+
+# Clean workspace and Global Environment
+
+dat <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Bleaching_Survey_Preliminary.csv", sep=";", dec=",")
+
+dat <- dat[dat$Size %in% c("Big", "Medium"),]
+dat <- dat[dat$Observations >0,]
+
+dat_ana <- lapply(1:nrow(dat), function(x) {
+  
+  obs <- dat[x,]$Observations
+  lines <- rep(x, obs)
+  
+  do.call(rbind,lapply(lines, function (y) {dat[y,]  }))
+  
+})
+
+dat_ana <- do.call(rbind, dat_ana)
+
+levels(dat_ana$Status)
+
+
+# Mean of Number of colonies per quadrat at each depth
+nb_colonies <- ddply(dat_ana, ~ Site  + Depth + Quadrat ,function(x){
+  c(nb_colonies=sum(x$Observations)) }) 
+
+nb_colonies <- nb_colonies %>% complete( Site,Depth,Quadrat,fill = list(nb_colonies = 0))
+
+nb_colonies_Depth <- ddply(nb_colonies, ~ Depth ,function(x){
+  c(nb_colonies=mean(x$nb_colonies), nb_colonies_se=sd(x$nb_colonies) / sqrt(length(x$nb_colonies))) }) 
+nb_colonies_Site_Depth <- ddply(nb_colonies, ~ Site + Depth ,function(x){
+  c(nb_colonies=mean(x$nb_colonies), nb_colonies_se=sd(x$nb_colonies) / sqrt(length(x$nb_colonies))) }) 
+
+nb_colonies_2 <- ddply(dat_ana, ~ Site  + Depth + Size + Quadrat ,function(x){
+  c(nb_colonies=sum(x$Observations)) }) 
+nb_colonies_2 <- nb_colonies_2 %>% complete( Site,Depth,Quadrat,Size,fill = list(nb_colonies = 0))
+nb_colonies_Site_Depth_Size <- ddply(nb_colonies_2, ~ Site + Depth  + Size, function(x){
+  c(nb_colonies=mean(x$nb_colonies), nb_colonies_se=sd(x$nb_colonies) / sqrt(length(x$nb_colonies))) }) 
+
+# Install the necessary packages
+library("parallel"); library ("cmdstanr"); library (tidybayes)
+
+# Modelling formula. This takes a while, except if run from server. Otherwise, load directly the output of the model. 
+# If run from personal computer, remove "backend" and "threads"
+
+# fit_2 <- brms::brm(Status ~ 1 + Depth + (1 + Depth | Genus) +  (1|Site), data = dat_ana, family = categorical(link = "logit", refcat = NULL),  control = list(max_treedepth = 14, adapt_delta = 0.99),  chains = 4, cores = 4, iter = 7000, warmup = 3000, backend = "cmdstanr",threads = 20)
+
+# The formula uses Depth as a fixed factor, Depth as a fixed factor and Genus as a random factor to account for the differences among genera, and Site as a random factor to consider different origins 
+
+# save(fit_2, file="fit_brms_Bleaching.RData")
+
+
+# Load the output of the model straight
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+load("fit_brms_Bleaching.RData") 
+
+# Check output of the model 
+# print(fit_2, pars = "b")
+# summary (fit_2)
+# coef(fit_2)
+
+
+# condiitional effects
+ce <- conditional_effects(fit_2,categorical = T, probs = c(0.33, 0.66), method = c("fitted"))
+# Probs  # 0.025, 0.975 had to be changed to 0.33 to 0.66 
+
+
+# plot conditional effects for each predictor
+# Set the levels and colors for the plot
+ce$`Depth:cats__`$Status = factor(ce$`Depth:cats__`$Status,levels = c ("Healthy",  "Pale","Bleached","Dead"))
+colours <- c( "forestgreen","green ","orange", "red")
+
+# DElete the x_continuous if you consider it is not necessary
+plot_general <- plot(ce, plot = FALSE)[[1]] + scale_color_manual(values= colours,breaks=c("Healthy",  "Pale","Bleached","Dead"))+
+  scale_fill_manual(values= colours, breaks = c("Healthy",  "Pale","Bleached","Dead"))  + 
+    scale_x_continuous(name ="Depth (m)", limits=c(6,90), breaks = c(6,20,40,60,90)) +
+     labs(x = "Depth (m)",  y = "Probability",  title = "Bayesian Prediction of Status in Depth") + theme_classic()
+plot_general
+ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figures/plot_general.pdf", width = 30, height = 30, units = "cm")
+
+# This shows the expected/predicted status as a function of the predictor variable (Depth)
+# The estimate of being healthy clearly increased in depth 
+
+
+
+# Posterior predicted distribution
+# Load the output of the model - if haven't executed or done it
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+load("fit_brms_Bleaching.RData") 
+
+# Create the reference dataframe - newdata (Here for all depths)
+Depth <- unique (fit_2$data$Depth)
+Genus <- unique (fit_2$data$Genus)
+# unique (fit_2$data$Site)
+ref_data <- crossing(Depth, Genus)
+ref_data$Site <- NA
+
+
+# Forest plots with the posteriors
+fitted_values <- posterior_epred(fit_2, newdata = ref_data, re_formula = 'Status ~ 1 + Depth + (1 + Depth | Genus)')
+
+# Number of rows equals to ref_data and number of dimensions is equal to (ngenus*depths*Satus)
+# str (fitted_values)
+# dim (fitted_values)
+
+
+# Select only the healthy values of the array
+# Array organised like this ([fvalue observations,position-rows,status] )
+healhty <- as.data.frame (fitted_values [c(1:16000),,3])
+# Necessary to traspose
+healthy <- t(healhty)
+
+# Create combination of red_data with healthy
+ref_data_fitted <- cbind (ref_data,healthy)
+
+# Multiple columns of predictions into a single one. 
+ref_data_fitted <- melt (ref_data_fitted, id.vars = c ("Depth", "Genus", "Site"), na.rm = F, measure.vars = c(4:103), value.name = c("Prob"))
+
+
+####### Check the depth ranges and number of replicates of genera ####### 
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019")
+deep_bleaching <- read.csv(file = "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bleaching_Survey_Preliminary.csv", header = T, dec = ".", sep = ";")
+
+keep_size <-  c ("Big", "Medium") # do not run for the test of bleaching according to size
+deep_bleaching <- deep_bleaching[deep_bleaching$Size %in% keep_size, ]
+
+Depth_range <- ddply(deep_bleaching,~ Depth + Genus ,function(x){c(Nb_observ_depth=nrow(x))})
+####### Check the depth ranges and number of replicates of genera ####### 
+
+# Get back to working directory
+
+ 
+
+# ONLY CONSIDER Depths with MORE THAN 25 replicates per depth and genera with more than 100 replicates for all depths
+# Other genera are dropped 
+# View (Depth_range)
+
+
+########### I am sure there's an automatic code for doing this ########### 
+
+ref_data_fitted_Astrea <- subset(ref_data_fitted , Genus == "Astrea")
+ref_data_fitted_Astrea <- subset(ref_data_fitted_Astrea, Depth == 6 | Depth == 20)
+ref_data_fitted_Astrea$Limit <- ref_data_fitted_Astrea$Depth
+ref_data_fitted_Astrea$Limit <- as.factor (ref_data_fitted_Astrea$Limit)
+ref_data_fitted_Astrea$Limit<- str_replace_all(ref_data_fitted_Astrea$Limit, c("6" = "Upper", "20" = "Lower"))
+
+
+ref_data_fitted_Acropora <- subset(ref_data_fitted , Genus == "Acropora")
+ref_data_fitted_Acropora <- subset(ref_data_fitted_Acropora, Depth == 6 | Depth == 60)
+ref_data_fitted_Acropora$Limit <- ref_data_fitted_Acropora$Depth
+ref_data_fitted_Acropora$Limit <- as.factor (ref_data_fitted_Acropora$Limit)
+ref_data_fitted_Acropora$Limit<- str_replace_all(ref_data_fitted_Acropora$Limit, c("60" = "Lower", "6" = "Upper"))
+
+ref_data_fitted_Montipora <- subset(ref_data_fitted , Genus == "Montipora")
+ref_data_fitted_Montipora <- subset(ref_data_fitted_Montipora, Depth == 6 | Depth == 60)
+ref_data_fitted_Montipora$Limit <- ref_data_fitted_Montipora$Depth
+ref_data_fitted_Montipora$Limit <- as.factor (ref_data_fitted_Montipora$Limit)
+ref_data_fitted_Montipora$Limit<- str_replace_all(ref_data_fitted_Montipora$Limit, c("60" = "Lower", "6" = "Upper"))
+
+ref_data_fitted_Pocillopora <- subset(ref_data_fitted , Genus == "Pocillopora")
+ref_data_fitted_Pocillopora <- subset(ref_data_fitted_Pocillopora, Depth == 6 | Depth == 60)
+ref_data_fitted_Pocillopora$Limit <- ref_data_fitted_Pocillopora$Depth
+ref_data_fitted_Pocillopora$Limit <- as.factor (ref_data_fitted_Pocillopora$Limit)
+ref_data_fitted_Pocillopora$Limit<- str_replace_all(ref_data_fitted_Pocillopora$Limit, c("60" = "Lower", "6" = "Upper"))
+
+ref_data_fitted_Sandalolitha <- subset(ref_data_fitted , Genus == "Sandalolitha")
+ref_data_fitted_Sandalolitha <- subset(ref_data_fitted_Sandalolitha, Depth == 20 | Depth == 60)
+ref_data_fitted_Sandalolitha$Limit <- ref_data_fitted_Sandalolitha$Depth
+ref_data_fitted_Sandalolitha$Limit <- as.factor (ref_data_fitted_Sandalolitha$Limit)
+ref_data_fitted_Sandalolitha$Limit<- str_replace_all(ref_data_fitted_Sandalolitha$Limit, c("20" = "Upper", "60" = "Lower"))
+
+ref_data_fitted_Fungia <- subset(ref_data_fitted , Genus == "Fungia")
+ref_data_fitted_Fungia <- subset(ref_data_fitted_Fungia, Depth == 6 | Depth == 60)
+ref_data_fitted_Fungia$Limit <- ref_data_fitted_Fungia$Depth
+ref_data_fitted_Fungia$Limit <- as.factor (ref_data_fitted_Fungia$Limit)
+ref_data_fitted_Fungia$Limit<- str_replace_all(ref_data_fitted_Fungia$Limit, c("60" = "Lower", "6" = "Upper"))
+
+ref_data_fitted_Pavona <- subset(ref_data_fitted , Genus == "Pavona")
+ref_data_fitted_Pavona <- subset(ref_data_fitted_Pavona, Depth == 6 | Depth == 90)
+ref_data_fitted_Pavona$Limit <- ref_data_fitted_Pavona$Depth
+ref_data_fitted_Pavona$Limit <- as.factor (ref_data_fitted_Pavona$Limit)
+ref_data_fitted_Pavona$Limit<- str_replace_all(ref_data_fitted_Pavona$Limit, c("6" = "Upper", "90" = "Lower"))
+
+ref_data_fitted_Leptastrea <- subset(ref_data_fitted , Genus == "Leptastrea")
+ref_data_fitted_Leptastrea <- subset(ref_data_fitted_Leptastrea, Depth == 6 | Depth == 90)
+ref_data_fitted_Leptastrea$Limit <- ref_data_fitted_Leptastrea$Depth
+ref_data_fitted_Leptastrea$Limit <- as.factor (ref_data_fitted_Leptastrea$Limit)
+ref_data_fitted_Leptastrea$Limit<- str_replace_all(ref_data_fitted_Leptastrea$Limit, c("6" = "Upper", "90" = "Lower"))
+
+ref_data_fitted_Echinophyllia <- subset(ref_data_fitted , Genus == "Echinophyllia")
+ref_data_fitted_Echinophyllia <- subset(ref_data_fitted_Echinophyllia, Depth == 60 | Depth == 90)
+ref_data_fitted_Echinophyllia$Limit <- ref_data_fitted_Echinophyllia$Depth
+ref_data_fitted_Echinophyllia$Limit <- as.factor (ref_data_fitted_Echinophyllia$Limit)
+ref_data_fitted_Echinophyllia$Limit<- str_replace_all(ref_data_fitted_Echinophyllia$Limit, c("60" = "Upper", "90" = "Lower"))
+
+ref_data_fitted_Psammocora <- subset(ref_data_fitted , Genus == "Psammocora")
+ref_data_fitted_Psammocora <- subset(ref_data_fitted_Psammocora, Depth == 20 | Depth == 40)
+ref_data_fitted_Psammocora$Limit <- ref_data_fitted_Psammocora$Depth
+ref_data_fitted_Psammocora$Limit <- as.factor (ref_data_fitted_Psammocora$Limit)
+ref_data_fitted_Psammocora$Limit<- str_replace_all(ref_data_fitted_Psammocora$Limit, c("20" = "Upper", "40" = "Lower"))
+
+ref_data_fitted_Leptoseris <- subset(ref_data_fitted , Genus == "Leptoseris")
+ref_data_fitted_Leptoseris <- subset(ref_data_fitted_Leptoseris, Depth == 6 | Depth == 90)
+ref_data_fitted_Leptoseris$Limit <- ref_data_fitted_Leptoseris$Depth
+ref_data_fitted_Leptoseris$Limit <- as.factor (ref_data_fitted_Leptoseris$Limit)
+ref_data_fitted_Leptoseris$Limit<- str_replace_all(ref_data_fitted_Leptoseris$Limit, c("6" = "Upper", "90" = "Lower"))
+
+ref_data_fitted_Pachyseris <- subset(ref_data_fitted , Genus == "Pachyseris")
+ref_data_fitted_Pachyseris <- subset(ref_data_fitted_Pachyseris, Depth == 40 | Depth == 60)
+ref_data_fitted_Pachyseris$Limit <- ref_data_fitted_Pachyseris$Depth
+ref_data_fitted_Pachyseris$Limit <- as.factor (ref_data_fitted_Pachyseris$Limit)
+ref_data_fitted_Pachyseris$Limit<- str_replace_all(ref_data_fitted_Pachyseris$Limit, c("40" = "Upper", "60" = "Lower"))
+
+ref_data_fitted_Porites <- subset(ref_data_fitted , Genus == "Porites")
+ref_data_fitted_Porites <- subset(ref_data_fitted_Porites, Depth == 6 | Depth == 60)
+ref_data_fitted_Porites$Limit <- ref_data_fitted_Porites$Depth
+ref_data_fitted_Porites$Limit <- as.factor (ref_data_fitted_Porites$Limit)
+ref_data_fitted_Porites$Limit<- str_replace_all(ref_data_fitted_Porites$Limit, c("60" = "Lower", "6" = "Upper"))
+########### I am sure there's an automatic code for doing this ########### 
+
+# According to the requirements above, some genera ommited 
+ref_data_fitted2 <- rbind (ref_data_fitted_Astrea,ref_data_fitted_Acropora,ref_data_fitted_Montipora,ref_data_fitted_Pocillopora,ref_data_fitted_Sandalolitha,ref_data_fitted_Fungia,ref_data_fitted_Pavona,ref_data_fitted_Leptastrea,ref_data_fitted_Echinophyllia,ref_data_fitted_Psammocora,ref_data_fitted_Leptoseris,ref_data_fitted_Pachyseris,ref_data_fitted_Porites)
+# Remove the generated dataframes above
+rm (ref_data_fitted_Acropora,ref_data_fitted_Porites,ref_data_fitted_Pachyseris,ref_data_fitted_Leptoseris,ref_data_fitted_Psammocora,ref_data_fitted_Echinophyllia,ref_data_fitted_Leptastrea,ref_data_fitted_Pavona,ref_data_fitted_Fungia,ref_data_fitted_Sandalolitha,ref_data_fitted_Pocillopora,ref_data_fitted_Montipora,ref_data_fitted_Astrea)
+
+
+# New order of genera according to senstivity
+ref_data_fitted2$Genus = factor (ref_data_fitted2$Genus, levels = c ("Astrea","Acropora","Montipora","Pocillopora","Fungia","Pavona","Leptastrea","Leptoseris","Sandalolitha","Porites","Psammocora","Pachyseris","Echinophyllia"))
+
+ref_data_fitted2$Limit = factor (ref_data_fitted2$Limit, levels = c ("Upper", "Lower"))
+
+
+
+colours <- brewer.pal(5,"GnBu")
+
+fp_upper_lower <- ggplot(ref_data_fitted2, aes(x = Prob, y = as.factor (Genus), fill = as.factor (Depth))) +
+  geom_density_ridges(scale = 1, rel_min_height = 0.05 ) +  
+  scale_fill_manual(values= colours) + 
+  facet_wrap(~Limit, ncol = 2) +  xlim(0, 1) +  xlab ("") + ylab ("")+
+  guides(fill=guide_legend(title="Depth (m)")) +
+  theme( axis.text=element_text(size=12), axis.title=element_text(size=16,face="bold"))+
+  theme_bw() +  theme(legend.position="bottom")
+fp_upper_lower
+ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figures/fp_upper_lower.pdf", width = 13, height = 20, units = "cm")
+
+
+
+
+
+# Conditional effects per genera
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+load("fit_brms_Bleaching.RData")  
+
+# Only for genus 
+conditions <- make_conditions(fit_2, vars = c( "Genus"))
+# It takes a while. You can load the output below
+# ce_Genus <- conditional_effects(fit_2,  conditions = conditions, categorical = T, probs = c(0.33, 0.66), method = c("fitted"), re_formula = NULL)
+# save(ce_Genus, file="ce_Genus.RData")
+
+# Load the output from the conditional effects above
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+load("ce_Genus.RData")
+
+# Finally, I got the test as I wanted
+ce_Genus$`Depth:cats__`$Status = factor(ce_Genus$`Depth:cats__`$Status,levels = c ("Healthy",  "Pale","Bleached","Dead"))
+colours <- c( "forestgreen","green ","orange", "red")
+
+# DElete the  if you consider it is not necessary
+status_genera <- plot(ce_Genus, plot = FALSE)[[1]] + scale_color_manual(values= colours,breaks=c("Healthy",  "Pale","Bleached","Dead"))+
+  facet_wrap(~ce_Genus$`Depth:cats__`$Genus, scales='free', )+
+  scale_fill_manual(values= colours, breaks = c("Healthy",  "Pale","Bleached","Dead"))  + 
+  scale_x_continuous(name ="Depth (m)", limits=c(6,90), breaks = c(6,20,40,60,90)) +
+  scale_y_continuous(name ="Probability ", limits=c(0.00,1.00), breaks = c(0.00,0.25,0.50,0.75,1.00)) +
+  labs(x = "Depth (m)",  y = "Probability",  title = "Bayesian Prediction of Status of Genera in Depth") + 
+  theme_classic() + theme(strip.background = element_blank())
+status_genera
+ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figures/status_genera.pdf", width = 30, height = 30, units = "cm")
+
+# From this figure, I made Fig.2 B in AI keeping the most relevant genera
+
+
+```
+
+
+#### FROM HERE -  SUPPLEMENTARY DATA
+# Figure S1
+# Map was done with QGIS - (S1A)
+
+## Bleaching with depth
+# Proportion of each health bleaching status per Depth and Island (S1 B)
+
+```{r message=FALSE, warning=FALSE}
+
+# Clean workspace and Global Environment
+rm (list=ls())
+
+
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019")
+deep_bleaching <- read.csv(file = "Bleaching_Survey_Preliminary.csv", header = T, dec = ".", sep = ";")
+
+
+# str (deep_bleaching)
+# summary (deep_bleaching)
+deep_bleaching$Depth <- as.numeric(as.character(deep_bleaching$Depth))
+deep_bleaching$Observations <- as.numeric(deep_bleaching$Observations)
+
+
+deep_bleaching_small <- deep_bleaching
+keep_size <-  c ("Big", "Medium") # do not run for the test of bleaching according to size
+deep_bleaching <- deep_bleaching[deep_bleaching$Size %in% keep_size, ]
+
+deep_bleaching$Genus_Species <- paste(deep_bleaching$Genus, deep_bleaching$Species, sep='_')
+
+
+# Per depth, site, status only
+
+
+resume_site_status_depth <- data.frame()
+for(n in unique(deep_bleaching$Site)){
+new0 <-subset (deep_bleaching, Site == n)
+  for(i in unique(new0$Depth)){
+  new <-subset (new0, Depth == i)
+    for (j in unique (new$Status)){
+      new2 <- subset (new, Status == j)
+      new3 <- aggregate(Observations ~ Site + Depth + Status, new2, sum)
+      resume_site_status_depth = rbind (resume_site_status_depth, new3)
+    }
+}}
+
+total <- aggregate (Observations ~ Site + Depth, resume_site_status_depth, sum)
+
+resume_site_status_depth <- merge (resume_site_status_depth, total, by = c("Site","Depth"))
+colnames (resume_site_status_depth)<- c("Site","Depth","Status","Observations","Total")
+
+resume_site_status_depth$Proportion <- (resume_site_status_depth$Observations / resume_site_status_depth$Total) 
+
+
+# standard error/deviation of a sample proportion 1.96 to use 95% CI
+resume_site_status_depth$Standard_Error <- (1.96) * sqrt ( resume_site_status_depth$Proportion * (1 - resume_site_status_depth$Proportion ) / resume_site_status_depth$Total)
+
+# In percentatges
+resume_site_status_depth$Proportion <- resume_site_status_depth$Proportion*100
+resume_site_status_depth$Standard_Error <- resume_site_status_depth$Standard_Error*100
+
+
+# Plot the two islands separately (from "resume_site_status_depth"). 
+# Just to show, this figure is not necessary according to me. We consider site as random factor. 
+
+
+resume_site_status_depth$Status = factor(resume_site_status_depth$Status,levels = c ("Healthy",  "Pale","Bleached","Dead"))
+colours <- c( "forestgreen","green ","orange", "red")
+
+resume_site_status_depth$Site = factor(resume_site_status_depth$Site,levels = c ("Moorea",  "Makatea"))
+
+
+##### This is one of the used figures
+Islands <- ggplot(resume_site_status_depth, aes(x = factor(Status), y = Proportion, fill = Status)) +
+  geom_bar(stat = "identity", colour = "black") + 
+  geom_errorbar(aes(ymin=Proportion-Standard_Error, ymax=Proportion+Standard_Error), width = 0.2, color = "black") + 
+  facet_grid(Site ~ Depth, switch = "y") +  scale_y_continuous(position = "right",breaks = c(0,25,50,75,100)) +
+  ylab ("Percentatge (%)") + xlab ("Status") + scale_fill_manual(values = colours) + ggtitle("Bleaching at monitoring depths")+
+  theme(axis.text.x = element_text(size =2, angle = 90, hjust = 1), strip.text.x = element_text(size = 2, colour = "black", 
+    angle = 90)) + theme_classic() 
+Islands
+ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Islands.pdf", width = 13, height = 11, units = "cm")
+
+# Check the proportions in
+# View (resume_site_status_depth)
+
+```
+
+## Temperature and light data from loggers
+# Figure S2
+
+```{r message=FALSE, warning=FALSE}
+# Clean workspace and Global Environment
+rm (list=ls())
+
+##################### Temperature ##################### 
+
+
+
+### 1st Moorea
+
+# Choose directory where you have CSV and function reading
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MOO1")
+
+# Introduce filenames of the folder between " " .
+# Very importanct to put them in same order than prof
+
+file.names = c("MO1-20-temp.csv","MO1-40-temp.csv","MO1-60-temp.csv","MO1-90-temp.csv","MO1-120-temp.csv")
+prof = c(20,40,60,90,120)
+df_all=data.frame()
+
+# Introduce limits of time, to get to the depth and to take it out "Year-M-D h:m:s"
+check_time_date <- read.csv ("MO1-120-temp.csv",header = F, dec = ".", sep = ",", skip = 1)
+#View (check_time_date)
+
+# Introduce them. Later they need to be corrected once graph is checked 
+Date_Time_initial = "2018-08-23 07:00:00"
+Date_Time_final =   "2018-08-25 22:00:00"
+
+for(x in 1:length(file.names)){
+  prof_file = read.csv(file = file.names[x], header = T, dec = ".", sep = ",", skip = 1)
+  df = data.frame(prof_file)
+  df <- df[,c(2,3)]
+  colnames(df) <- c("Date_Time", "Temperature")
+  df$Date_Time <- paste0("20", df$Date_Time)
+  df$Date_Time <- as.POSIXct(df$Date_Time, format="%Y/%m/%d %H:%M:%S")
+  df <- subset(df, Date_Time > Date_Time_initial & Date_Time < Date_Time_final)
+  df$Depth <- prof[x]
+  df_all = rbind(df_all,df)
+  # str (df)
+}
+
+
+df_all$Depth <- as.factor (df_all$Depth)
+
+df_all$Time <- format(df_all$Date_Time,"%H:%M:%S")
+
+myColors<- c( '20' = 'aquamarine2', '40' = 'deepskyblue', '60' = 'blue', '90' = 'navyblue','120' = 'black') # '6' = 'cornsilk'
+names(myColors) <- levels(df$Depth)
+colScale <- scale_colour_manual(name = "Depth",values = myColors)
+
+# Synoid for seeing internal waves
+
+plot_bleaching <- ggplot(data = df_all, aes (y=Temperature, x = Date_Time, group = Depth, color = Depth)) +
+                   geom_point(size = 0.01) + geom_line(size = 0.05) + geom_smooth(method = "loess", span = 0.1, se = F) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) +    colScale +
+                   scale_x_datetime( date_breaks = "12 hour", date_labels = "%d %b %R") + xlab ("") + ylab ("Temperature (ºC)") +
+                   guides(colour = guide_legend(reverse=F)) + theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plot_bleaching
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Temp_Raw_Mooz.pdf", plot_bleaching,width = 4.8, height = 4.5)
+
+# Index loss respect to 6m
+
+Index_temperature <- df_all
+
+# Index_temperature <- subset(Index_temperature, Time < "16:00:00" & Time > "09:00:00")
+
+
+df_mean_time <- aggregate(Temperature ~  Depth + Time, Index_temperature, mean)
+df_mean_time$sd <- aggregate(Temperature ~  Depth + Time, Index_temperature, sd) [,3]
+df_mean_time$sdpos <- df_mean_time$Temperature + df_mean_time$sd
+df_mean_time$sdneg <- df_mean_time$Temperature - df_mean_time$sd
+
+
+# Measure the index
+
+# Divide Temperature by Temperture of 6
+df_mean_time$Index <- df_mean_time$Temperature
+normalize_temp = data.frame()
+for(i in unique(df_mean_time$Time)){
+  new <-subset (df_mean_time, Time == i)
+  # print(new)
+  new$Index <-  ((new$Temperature)  / new$Temperature [new$Depth == 20])
+  normalize_temp = rbind (normalize_temp, new)
+  # print (new_recrue)
+}
+
+# Index between 0--> 100% (Percentatges)
+normalize_temp$Index <- normalize_temp$Index*100
+
+Index_temp <- normalize_temp
+
+
+#table2$Depth2<-as.numeric(table2$Depth2)
+Index_temp$Depth<-as.numeric(as.character(Index_temp$Depth))
+
+Median <- aggregate (Temperature ~  Depth,  Index_temp, median)
+Mean <- aggregate (Temperature ~  Depth,  Index_temp, mean) 
+# Sd <- aggregate (Temperature ~  Depth,  Index_temp, fun = sd) 
+Max <- aggregate (Temperature ~  Depth,  Index_temp, max)
+Min <- aggregate (Temperature ~  Depth,  Index_temp, min)
+colnames (Median) <- c ("Depth","Median")
+colnames (Mean) <- c ("Depth","Mean")
+# colnames (Sd) <- c ("Depth","Sd")
+colnames (Max) <- c ("Depth","Max")
+colnames (Min) <- c ("Depth","Min")
+
+
+Index_temp <- merge (Index_temp, Median, by = "Depth")
+Index_temp <- merge (Index_temp, Mean, by = "Depth")
+# Index_temp <- merge (Index_temp, Sd, by = "Depth")
+Index_temp <- merge (Index_temp, Max, by = "Depth")
+Index_temp <- merge (Index_temp, Min, by = "Depth")
+
+
+######## This is the good one #########
+plot <- ggplot(data=Index_temp, aes(y= Depth , x =Temperature, xmin = Min, xmax = Max,color =Index))+
+  geom_errorbar (size = 1,width = 2) +   geom_point (aes(y= Depth , x =Temperature, size = 0.5)) + 
+  # geom_smooth(method = "loess",color="grey", fill="grey", size=0.2, alpha=0.2)+
+  geom_path (aes(y= Depth,x =Mean,color=Index),size = 2,width = 2,alpha = 0.3) +
+  geom_point (aes(y= Depth , x =Mean, size = 0.8)) +
+  scale_y_reverse(name ="Depth (m)", limits=c(100,0),breaks = c(100,90, 60, 40, 20, 6,0))+
+  scale_x_continuous(position = "top",limits=c(25.5,27.5),breaks = c(25.5,26,26.5,27)) + 
+  scale_colour_gradient2(low ="blue4", mid = "blue",  high = "red", midpoint = 94.5)+
+  labs(x = "Temperature (ºC)", y="Depth (m)")+
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plot
+######## This is the good one #########
+
+write.csv(Index_temp, "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MOO1/MOO1_Temp_Index.csv")
+
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Temp_Index_Moo.pdf", plot,width = 4.8, height = 4.5) 
+
+
+
+###### 2nd Makatea
+
+
+# Choose directory where you have CSV and function reading
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1")
+
+# Introduce filenames of the folder between " " .
+# Very importanct to put them in same order than prof
+
+
+# Introduce filenames of the folder between " " 
+file.names = c("MAK1-6-temp.csv","MAK1-20-temp.csv","MAK1-40-temp.csv","MAK1-60-temp.csv","MAK1-90-temp.csv", "MAK1-120-temp.csv")
+prof = c(6,20,40,60,90,120)
+df_all=data.frame()
+
+# Introduce limits of time, to get to the depth and to take it out "Year-M-D h:m:s"
+check_time_date <- read.csv ("MAK1-120-temp.csv",header = F, dec = ".", sep = ",", skip = 1)
+# View (check_time_date)
+
+# Introduce them. Later they need to be corrected once graph is checked 
+Date_Time_initial = "2019-06-07 11:00:00"    
+Date_Time_final = "2019-06-10 11:00:00"     
+
+for(x in 1:length(file.names)){
+  prof_file = read.csv(file = file.names[x], header = T, dec = ".", sep = ",", skip = 1)
+  df = data.frame(prof_file)
+  df <- df[,c(2,3)]
+  colnames(df) <- c("Date_Time", "Temperature")
+  df$Date_Time <- paste0("20", df$Date_Time)
+  df$Date_Time <- as.POSIXct(df$Date_Time, format="%Y/%m/%d %H:%M:%S")
+  df <- subset(df, Date_Time > Date_Time_initial & Date_Time < Date_Time_final)
+  df$Depth <- prof[x]
+  df_all = rbind(df_all,df)
+  # str (df)
+}
+
+
+
+df_all$Depth <- as.factor (df_all$Depth)
+
+df_all$Time <- format(df_all$Date_Time,"%H:%M:%S")
+
+# Plot the graph
+df_all$Depth <- as.factor (df_all$Depth)
+
+myColors<- c('6' = 'wheat', '20' = 'aquamarine2', '40' = 'deepskyblue', '60' = 'blue', '90' = 'navyblue','120' = 'black') # '6' = 'cornsilk'
+names(myColors) <- levels(df$Depth)
+colScale <- scale_colour_manual(name = "Depth",values = myColors)
+
+# Synoid for seeing internal waves
+
+plot_bleaching <- ggplot(data = df_all, aes (y=Temperature, x = Date_Time, group = Depth, color = Depth)) +
+                  geom_point(size = 0.01) + geom_line(size = 0.05) + geom_smooth(method = "loess", span = 0.1, se = F) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) +    colScale +
+                  scale_x_datetime( date_breaks = "12 hour", date_labels = "%d %b %R") + xlab ("") + ylab ("Temperature (ºC)") +
+                  guides(colour = guide_legend(reverse=F)) + theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plot_bleaching
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Temp_Raw_Mak.pdf", plot_bleaching,width = 4.8, height = 4.5)
+
+
+# Index loss respect to 6m
+
+Index_temperature <- df_all
+
+# Index_temperature <- subset(Index_temperature, Time < "16:00:00" & Time > "09:00:00")
+
+
+df_mean_time <- aggregate(Temperature ~  Depth + Time, Index_temperature, mean)
+df_mean_time$sd <- aggregate(Temperature ~  Depth + Time, Index_temperature, sd) [,3]
+df_mean_time$sdpos <- df_mean_time$Temperature + df_mean_time$sd
+df_mean_time$sdneg <- df_mean_time$Temperature - df_mean_time$sd
+
+
+# Measure the index
+
+# Divide Temperature by Temperture of 6
+df_mean_time$Index <- df_mean_time$Temperature
+normalize_temp = data.frame()
+for(i in unique(df_mean_time$Time)){
+  new <-subset (df_mean_time, Time == i)
+  # print(new)
+  new$Index <-  ((new$Temperature)  / new$Temperature [new$Depth == 6])
+  normalize_temp = rbind (normalize_temp, new)
+  # print (new_recrue)
+}
+
+# Index between 0--> 100% (Percentatges)
+normalize_temp$Index <- normalize_temp$Index*100
+
+Index_temp <- normalize_temp
+
+
+# subset only to the values of the day...
+
+
+#table2$Depth2<-as.numeric(table2$Depth2)
+Index_temp$Depth<-as.numeric(as.character(Index_temp$Depth))
+
+Median <- aggregate (Temperature ~  Depth,  Index_temp, median)
+Mean <- aggregate (Temperature ~  Depth,  Index_temp, mean) 
+# Sd <- aggregate (Temperature ~  Depth,  Index_temp,  sd) 
+Max <- aggregate (Temperature ~  Depth,  Index_temp, max)
+Min <- aggregate (Temperature ~  Depth,  Index_temp, min)
+colnames (Median) <- c ("Depth","Median")
+colnames (Mean) <- c ("Depth","Mean")
+# colnames (Sd) <- c ("Depth","Sd")
+colnames (Max) <- c ("Depth","Max")
+colnames (Min) <- c ("Depth","Min")
+
+
+
+Index_temp <- merge (Index_temp, Median, by = "Depth")
+Index_temp <- merge (Index_temp, Mean, by = "Depth")
+# Index_temp <- merge (Index_temp, Sd, by = "Depth")
+Index_temp <- merge (Index_temp, Max, by = "Depth")
+Index_temp <- merge (Index_temp, Min, by = "Depth")
+
+
+######## This is the good one #########
+plot <- ggplot(data=Index_temp, aes(y= Depth , x =Temperature, xmin = Min, xmax = Max,color =Index))+
+  geom_errorbar (size = 1,width = 2) +   geom_point (aes(y= Depth , x =Temperature, size = 0.5)) + 
+  # geom_smooth(method = "loess",color="grey", fill="grey", size=0.2, alpha=0.2)+
+  geom_path (aes(y= Depth,x =Mean,color=Index),size = 2,width = 2,alpha = 0.3) +
+  geom_point (aes(y= Depth , x =Mean, size = 0.8)) +
+  scale_y_reverse(name ="Depth (m)", limits=c(100,0),breaks = c(100,90, 60, 40, 20, 6,0))+
+  scale_x_continuous(position = "top",limits=c(27,29.5),breaks = c(27,27.5,28,28.5,29)) + 
+  scale_colour_gradient2(low ="blue4", mid = "blue",  high = "red", midpoint = 94.5)+
+  labs(x = "Temperature (ºC)", y="Depth (m)")+
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plot
+######## This is the good one #########
+
+write.csv(Index_temp, "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1/MAK1_Temp_Index.csv")
+
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Temp_Index_Mak.pdf", plot,width = 4.8, height = 4.5) 
+
+
+
+##################### Light ##################### 
+
+### For Moorea
+# Choose directory where you have CSV and function reading
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1")
+
+# Introduce filenames of the folder between " " 
+file.names = c("MO1-20-light.csv","MO1-40-light.csv","MO1-60-light.csv","MO1-90-light.csv","MO1-120-light.csv")
+prof = c(20,40,60,90,120)
+df_all=data.frame()
+
+# Introduce limits of time, to get to the depth and to take it out. 
+Date_Time_initial = "2018-08-23 06:00:00"
+Date_Time_final =   "2018-08-25 21:00:00"
+
+for(x in 1:length(file.names)){
+  prof_file = read.csv(file = file.names[x], header = T, dec = ".", sep = ";", skip = 24)
+  df = data.frame(prof_file)
+  colnames(df) <- c("Date_Time", "Quantum","Battery")
+  df <- df[,-4]
+  df$Date_Time <- as.POSIXct(df$Date_Time, format="%d/%m/%Y %H:%M")
+  df <- subset(df, Date_Time > Date_Time_initial & Date_Time < Date_Time_final)
+  df$Depth <- prof[x]
+  df_all = rbind(df_all,df)
+  # str (df)
+}
+
+# Plot the graph
+df_all$Depth <- as.factor (df_all$Depth)
+
+
+# Detele all the values of night 
+df_all$Time <- format(df_all$Date_Time,"%H:%M:%S")
+df_all_day <- subset(df_all, Time < "17:00:00" & Time > "07:00:00")
+
+
+df_all_day <- aggregate(Quantum ~  Depth + Time,  df_all_day, mean)
+
+
+df_all_day$Time <- as.POSIXct(df_all_day$Time, format="%H:%M:%S")
+
+
+
+# Introduce the name of Id_Site, Archipelago, Island and Site
+df_all$Id_Site <- "SOCMOO-1"
+df_all$Archipelago <- "Society"
+df_all$Island <- "Moorea"
+df_all$Site <- "1"
+
+# Re order them 
+df_all <- df_all[,c(5,6,7,8,4,1,2,3)]
+
+
+
+myColors<- c( '20' = 'aquamarine2', '40' = 'deepskyblue', '60' = 'blue', '90' = 'navyblue','120' = 'black') # '6' = 'cornsilk'
+names(myColors) <- levels(df$Depth)
+colScale <- scale_colour_manual(name = "Depth",values = myColors)
+
+final_plot <- ggplot(data = df_all, aes (y=Quantum, x = Date_Time, group = Depth, color = Depth)) +
+  geom_point(size = 0.1) + geom_line (size = 0.05) +  geom_smooth(method = "loess", span = 0.15, se = F) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +    colScale +
+  scale_x_datetime( date_breaks = "12 hour", date_labels = "%d %b %R") + xlab ("") + ylab ("Light (μmol m-2 s-1)") +
+  ylim (0,250)  + 
+  guides(colour = guide_legend(reverse=F)) + 
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+final_plot
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Light_Raw_Mooz.pdf", final_plot,width = 4.8, height = 4.5)
+
+
+
+#### 
+
+# Beer Lambert conversion
+# Starting from df_all_day
+df_all_day$Time <- strftime(df_all_day$Time, format="%H:%M:%S")
+
+
+# For unique island and time, divide Quantum by Quantum of 20 
+lambert_light = data.frame()
+ref_prof = data.frame()
+for(i in unique(df_all_day$Time)){
+  new <-subset (df_all_day, Time == i)
+  new20 <- subset (new, Depth == 20) # Take out reference value
+  ref_prof = rbind (ref_prof,new20)
+  new <- subset (new, Depth != 20)
+  new$Depth <- as.numeric (as.character( new$Depth))
+  for (j in unique (new$Depth)){
+    new2 <- subset (new,  Depth == j)
+    # print(new)
+    new2$k <- -1 / (j*log(new20$Quantum [new20$Depth == 20]/new2$Quantum [new2$Depth == j]))
+    lambert_light = rbind (lambert_light, new2)
+    # print (new_recrue)
+  }}
+
+
+ref_prof$k <- NA
+
+# Lambert light
+lambert_light <- rbind (ref_prof,lambert_light)
+
+
+# Complete database adding quantum and k NA
+
+# Necessary to make --> Par(20m) * exp (K(40m) * 20)
+Six_Meters <- data.frame(
+  Depth=6,
+  Time= unique (lambert_light$Time))
+
+# Apply equation
+Six_Meters$Quantum <- lambert_light$Quantum [lambert_light$Depth == 20] / exp (lambert_light$k [lambert_light$Depth == 40] * 20)  
+
+Six_Meters$k <- NA
+
+lambert_light_Final <- rbind (Six_Meters, lambert_light)
+
+
+# Measure the index
+# For unique island and time, divide Quantum by Quantum of 6
+Relative_Index_Light = data.frame()
+for(i in unique(lambert_light_Final$Time)){
+  new <-subset (lambert_light_Final, Time == i)
+  # print(new)
+  new$Index <- (new$Quantum / new$Quantum [new$Depth == 6])
+  Relative_Index_Light = rbind (Relative_Index_Light, new)
+  # print (new_recrue)
+}
+
+#####
+
+# Index loss using Beer Lambert Equation
+
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1")
+Index_light <- read.csv(file = "Light_Lambert_MOO1.csv", header = T, dec = ".", sep = ";")
+
+Index_light <- subset(Index_light, Time < "16:00:00" & Time > "09:00:00")
+
+#table2$Depth2<-as.numeric(table2$Depth2)
+Index_light$Depth<-as.numeric(Index_light$Depth)
+
+Median <- aggregate (Quantum ~  Depth,  Index_light, median)
+Mean <- aggregate (Quantum ~  Depth,  Index_light, mean) 
+Max <- aggregate (Quantum ~  Depth,  Index_light, max)
+Min <- aggregate (Quantum ~  Depth,  Index_light, min)
+colnames (Median) <- c ("Depth","Median")
+colnames (Mean) <- c ("Depth","Mean")
+colnames (Max) <- c ("Depth","Max")
+colnames (Min) <- c ("Depth","Min")
+
+Index_light <- merge (Index_light, Median, by = "Depth")
+Index_light <- merge (Index_light, Mean, by = "Depth")
+Index_light <- merge (Index_light, Max, by = "Depth")
+Index_light <- merge (Index_light, Min, by = "Depth")
+
+myColors<- c('20' = 'darkslategray1', '40' = 'deepskyblue', '60' = 'blue', '90' = 'darkblue','120' = 'black')
+names(myColors) <- levels(df$Depth)
+colScale <- scale_colour_manual(name = "Depth",values = myColors)
+
+# scale_colour_gradient(myColors)+
+
+
+plot <- ggplot(data=Index_light, aes(y= Depth , x =Quantum, color =IndexLoss))+
+  geom_point(size = 0.5)+
+  geom_smooth( color="grey", fill="grey", size=0.2, alpha=0.2)+
+  scale_y_reverse(name ="Depth (m)", limits=c(100,0),breaks = c(90, 60, 40, 20, 6,0))+
+  scale_x_continuous (position = "top") + 
+  scale_colour_gradient2(low ="blue4", mid = "deepskyblue",  high = "yellow", midpoint = 50)+
+  labs(x = "Irradiance (μmol m-2 s-1)", y="Depth (m)")+
+  geom_point (aes(y= Depth , x =Median, size = 1)) + 
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+
+######## This is the good one #########
+plot <- ggplot(data=Index_light, aes(y= Depth , x =Quantum, xmin = Min, xmax = Max,color =IndexLoss))+
+  geom_errorbar (size = 1,width = 2) +  geom_point (aes(y= Depth , x =Quantum, size = 0.5)) + 
+#  geom_smooth(method = "loess", color="grey", fill="grey", size=0.2, alpha=0.2)+
+  geom_path (aes(y= Depth,x =Mean,color=IndexLoss),size = 2,width = 2,alpha = 0.3) +
+  geom_point (aes(y= Depth , x =Mean, size = 0.8)) +
+  scale_y_reverse(name ="Depth (m)", limits=c(100,0),breaks = c(90, 60, 40, 20, 6,0))+
+  scale_x_continuous (position = "top") + 
+  scale_colour_gradient2(low ="blue4", mid = "deepskyblue",  high = "skyblue", midpoint = 50)+
+  labs(x = "Irradiance (μmol m-2 s-1)", y="Depth (m)")+
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plot
+######## This is the good one #########
+
+write.csv(Index_light, "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1/MOO1_Light_Index.csv")
+
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Light_Index_Moo.pdf", plot,width = 4.8, height = 4.5)
+
+
+### For Makatea 
+# Choose directory where you have CSV and function reading
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1")
+
+
+# Introduce filenames of the folder between " " 
+file.names = c("MAK1-20-light.csv","MAK1-40-light.csv","MAK1-90-light.csv","MAK1-120-light.csv")
+prof = c(20,40,90,120)
+df_all=data.frame()
+
+check_time_date <- read.csv ("MAK1-120-light.csv", header = F, dec = ".", sep = ",", skip = 1)
+#View (check_time_date)
+
+# Introduce limits of time, to get to the depth and to take it out. 
+Date_Time_initial = "2019-06-07 10:30:00"    
+Date_Time_final = "2019-06-10 10:00:00"    
+
+for(x in 1:length(file.names)){
+  prof_file = read.csv(file = file.names[x], header = T, dec = ".", sep = ",", skip = 24)
+  df = data.frame(prof_file)
+  colnames(df) <- c("Date_Time", "Quantum","Battery")
+  df <- df[,-4]
+  df$Date_Time <- as.POSIXct(df$Date_Time, format="%Y/%m/%d %H:%M")
+  df <- subset(df, Date_Time > Date_Time_initial & Date_Time < Date_Time_final)
+  df$Depth <- prof[x]
+  df_all = rbind(df_all,df)
+  # str (df)
+}
+
+# Plot the graph
+df_all$Depth <- as.factor (df_all$Depth)
+
+
+# Detele all the values of night 
+df_all$Time <- format(df_all$Date_Time,"%H:%M:%S")
+df_all_day <- subset(df_all, Time < "17:00:00" & Time > "07:00:00")
+
+
+df_all_day <- aggregate(Quantum ~  Depth + Time,  df_all_day, mean)
+
+
+df_all_day$Time <- as.POSIXct(df_all_day$Time, format="%H:%M:%S")
+
+final_plot <- ggplot(data = df_all, aes (y=Quantum, x = Date_Time, group = Depth, color = Depth)) +
+  geom_point(size = 0.1) + geom_line (size = 0.05) +  geom_smooth(method = "loess", span = 0.15, se = F) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +    colScale +
+  scale_x_datetime( date_breaks = "12 hour", date_labels = "%d %b %R") + xlab ("") + ylab ("Light (μmol m-2 s-1)") +
+  ylim (0,250)  + 
+  guides(colour = guide_legend(reverse=F)) + 
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+final_plot
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Light_Raw_Mak.pdf", final_plot,width = 4.8, height = 4.5)
+
+
+# Beer Lambert conversion
+# Starting from df_all_day
+df_all_day$Time <- strftime(df_all_day$Time, format="%H:%M:%S")
+
+
+# For unique island and time, divide Quantum by Quantum of 20 
+lambert_light = data.frame()
+ref_prof = data.frame()
+for(i in unique(df_all_day$Time)){
+  new <-subset (df_all_day, Time == i)
+  new20 <- subset (new, Depth == 20) # Take out reference value
+  ref_prof = rbind (ref_prof,new20)
+  new <- subset (new, Depth != 20)
+  new$Depth <- as.numeric (as.character( new$Depth))
+  for (j in unique (new$Depth)){
+    new2 <- subset (new,  Depth == j)
+    # print(new)
+    new2$k <- -1 / (j*log(new20$Quantum [new20$Depth == 20]/new2$Quantum [new2$Depth == j]))
+    lambert_light = rbind (lambert_light, new2)
+    # print (new_recrue)
+  }}
+
+
+ref_prof$k <- NA
+
+# Lambert light
+lambert_light <- rbind (ref_prof,lambert_light)
+
+
+# Complete database adding quantum and k NA
+
+# Necessary to make --> Par(20m) * exp (K(40m) * 20)
+Six_Meters <- data.frame(
+  Depth=6,
+  Time= unique (lambert_light$Time))
+
+# Apply equation
+Six_Meters$Quantum <- lambert_light$Quantum [lambert_light$Depth == 20] / exp (lambert_light$k [lambert_light$Depth == 40] * 20)  
+
+Six_Meters$k <- NA
+
+lambert_light_Final <- rbind (Six_Meters, lambert_light)
+
+
+# Measure the index
+# For unique island and time, divide Quantum by Quantum of 6
+Relative_Index_Light = data.frame()
+for(i in unique(lambert_light_Final$Time)){
+  new <-subset (lambert_light_Final, Time == i)
+  # print(new)
+  new$Index <- (new$Quantum / new$Quantum [new$Depth == 6])
+  Relative_Index_Light = rbind (Relative_Index_Light, new)
+  # print (new_recrue)
+}
+
+#####
+
+
+# Index loss using Beer Lambert Equation
+
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1")
+Index_light <- read.csv(file = "Light_Lambert_MAK1.csv", header = T, dec = ".", sep = ";")
+
+Index_light <- subset(Index_light, Time < "16:00:00" & Time > "09:00:00")
+
+#table2$Depth2<-as.numeric(table2$Depth2)
+Index_light$Depth<-as.numeric(Index_light$Depth)
+
+Median <- aggregate (Quantum ~  Depth,  Index_light, median)
+Mean <- aggregate (Quantum ~  Depth,  Index_light, mean) 
+Max <- aggregate (Quantum ~  Depth,  Index_light, max)
+Min <- aggregate (Quantum ~  Depth,  Index_light, min)
+colnames (Median) <- c ("Depth","Median")
+colnames (Mean) <- c ("Depth","Mean")
+colnames (Max) <- c ("Depth","Max")
+colnames (Min) <- c ("Depth","Min")
+
+Index_light <- merge (Index_light, Median, by = "Depth")
+Index_light <- merge (Index_light, Mean, by = "Depth")
+Index_light <- merge (Index_light, Max, by = "Depth")
+Index_light <- merge (Index_light, Min, by = "Depth")
+
+myColors<- c('0' = 'yellow','6' = 'yellow', '20' = 'aquamarine', '40' = 'deepskyblue', '60' = 'blue', '90' = 'darkblue','120' = 'black')
+names(myColors) <- levels(df$Depth)
+colScale <- scale_colour_manual(name = "Depth",values = myColors)
+
+# scale_colour_gradient(myColors)+
+
+plot <- ggplot(data=Index_light, aes(y= Depth , x =Quantum, color =IndexLoss))+
+  geom_point(size = 0.5)+
+  geom_smooth( color="grey", fill="grey", size=0.2, alpha=0.2)+
+  scale_y_reverse(name ="Depth (m)", limits=c(100,0),breaks = c(90, 60, 40, 20, 6,0))+
+  scale_colour_gradient2(low ="blue4", mid = "deepskyblue",  high = "yellow", midpoint = 50)+
+  labs(x = "Irradiance (μmol m-2 s-1)", y="Depth (m)")+
+  geom_point (aes(y= Depth , x =Median, size = 1)) + 
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+######## This is the good one #########
+plot <- ggplot(data=Index_light, aes(y= Depth , x =Quantum, xmin = Min, xmax = Max,color =IndexLoss))+
+  geom_errorbar (size = 1,width = 2) +  geom_point (aes(y= Depth , x =Quantum, size = 0.5)) + 
+  #  geom_smooth(method = "loess", color="grey", fill="grey", size=0.2, alpha=0.2)+
+  geom_path (aes(y= Depth,x =Mean,color=IndexLoss),size = 2,width = 2,alpha = 0.3) +
+  geom_point (aes(y= Depth , x =Mean, size = 0.8)) +
+  scale_y_reverse(name ="Depth (m)", limits=c(100,0),breaks = c(90, 60, 40, 20, 6,0))+
+  scale_x_continuous (position = "top") + 
+  scale_colour_gradient2(low ="blue4", mid = "deepskyblue",  high = "skyblue", midpoint = 50)+
+  labs(x = "Irradiance (μmol m-2 s-1)", y="Depth (m)")+
+  theme(axis.line = element_line(colour = "black"), panel.background = element_blank(), panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+plot
+######## This is the good one #########
+ggsave ( "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Light_Index_Mak.pdf", plot,width = 4.8, height = 4.5)
+  
+
+
+```
+
+
+
+Correlations of loggers vs CTD vertical profiles    
+
+Fig. S3
+
+```{r cars}
+# Clean workspace and Global Environment
+rm (list=ls())
+# Loggers Temp
+Index_Temp_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MOO1/MOO1_Temp_Index.csv", sep=",", dec=",")
+Index_Temp_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1/MAK1_Temp_Index.csv", sep=",", dec=",")
+
+# Loggers light
+Index_Light_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1/MOO1_Light_Index.csv", sep=",", dec=",")
+Index_Light_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1/MAK1_Light_Index.csv", sep=",", dec=",")
+
+# CTD Makatea 
+CTD_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/CTD/MAKATEA/normalize_PAR.csv", sep=",", dec=",")
+PAR_final_six <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/CTD/MAKATEA/Makatea_PAR_final_six.csv", sep=",", dec=",")
+
+Temp_final_six <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/CTD/MAKATEA/Makatea_Temp_final_six.csv", sep=",", dec=",")
+
+
+################## 1 CTD with loggers profiles ################## 
+# First, CTD with profiles from loggers - light 
+
+# It has to be compared with PAR_final_six
+CTD_vs_loggers <- PAR_final_six [,c(2,3)] 
+CTD_vs_loggers$PAR_rel_six <- as.numeric (CTD_vs_loggers$PAR_rel_six )
+
+CTD_vs_loggers$PAR_rel_six <- CTD_vs_loggers$PAR_rel_six*100
+
+Index_Light_Makatea$IndexLoss <- as.numeric (Index_Light_Makatea$IndexLoss)
+Index_Loggers <- aggregate (IndexLoss ~  Depth,  Index_Light_Makatea, mean)
+
+CTD_vs_loggers <- merge (CTD_vs_loggers,Index_Loggers, by = "Depth")
+
+cor.test (CTD_vs_loggers$PAR_rel_six, CTD_vs_loggers$IndexLoss)
+cor.test(CTD_vs_loggers$PAR_rel_six, CTD_vs_loggers$IndexLoss, method ="spearman")
+cor.test(CTD_vs_loggers$PAR_rel_six, CTD_vs_loggers$IndexLoss, method ="kendall")
+
+ggplot(CTD_vs_loggers, aes(Depth)) + 
+  geom_line(aes(y = PAR_rel_six, colour = "red")) + 
+  geom_line(aes(y = IndexLoss, colour = "blue"))
+
+linm <- lm(PAR_rel_six ~ IndexLoss, data = CTD_vs_loggers)
+linm_resume <- summary(linm)
+plot (PAR_rel_six ~ IndexLoss, data = CTD_vs_loggers, ylab = "CTD", xlab = "Light loggers")
+mtext(paste0("R squared: ",round(linm_resume$r.squared,5)),adj = 0)
+mtext(paste0("P-value: ", format.pval(pf(linm_resume$fstatistic[1], # F-statistic
+                                         linm_resume$fstatistic[2], # df
+                                         linm_resume$fstatistic[3], # df
+                                         lower.tail = FALSE))))
+mtext(paste0("y = ",round(linm_resume$coefficients[1],2)," + ", 
+             round(linm_resume$coefficients[2],2),"x"),adj = 1)
+abline(lm(CTD_vs_loggers$PAR_rel_six ~ CTD_vs_loggers$IndexLoss), col = "black")
+
+
+
+# First, CTD with profiles from loggers - TEMPERATURE
+# It has to be compared with PAR_final_six
+CTD_vs_loggers <- Temp_final_six [,c(2,3)] 
+CTD_vs_loggers$Temp_rel_six <- as.numeric (CTD_vs_loggers$Temp_rel_six )
+
+CTD_vs_loggers$Temp_rel_six <- CTD_vs_loggers$Temp_rel_six*100
+
+Index_Temp_Makatea$Index <- as.numeric (Index_Temp_Makatea$Index)
+Index_Loggers <- aggregate (Index ~  Depth,  Index_Temp_Makatea, mean)
+
+CTD_vs_loggers <- merge (CTD_vs_loggers,Index_Loggers, by = "Depth")
+
+cor.test (CTD_vs_loggers$Temp_rel_six, CTD_vs_loggers$Index)
+cor.test(CTD_vs_loggers$Temp_rel_six, CTD_vs_loggers$Index, method ="spearman")
+cor.test(CTD_vs_loggers$Temp_rel_six, CTD_vs_loggers$Index, method ="kendall")
+
+ggplot(CTD_vs_loggers, aes(Depth)) + 
+  geom_line(aes(y = Temp_rel_six, colour = "red")) + 
+  geom_line(aes(y = Index, colour = "blue"))
+
+linm <- lm(Temp_rel_six ~ Index, data = CTD_vs_loggers)
+linm_resume <- summary(linm)
+plot (Temp_rel_six ~ Index, data = CTD_vs_loggers, ylab = "CTD Index", xlab = "Temperature loggers")
+mtext(paste0("R squared: ",round(linm_resume$r.squared,5)),adj = 0)
+mtext(paste0("P-value: ", format.pval(pf(linm_resume$fstatistic[1], # F-statistic
+                                         linm_resume$fstatistic[2], # df
+                                         linm_resume$fstatistic[3], # df
+                                         lower.tail = FALSE))))
+mtext(paste0("y = ",round(linm_resume$coefficients[1],2)," + ", 
+             round(linm_resume$coefficients[2],2),"x"),adj = 1)
+abline(lm(CTD_vs_loggers$Temp_rel_six ~ CTD_vs_loggers$Index), col = "black")
+
+################## 1 CTD with loggers profiles ################## 
+
+
+```
+### Likelihood of healthy and enviornmental profiles from loggers
+
+Fig S4
+
+```{r message=FALSE, warning=FALSE}
+
+# Clean workspace and Global Environment
+rm (list=ls())
+
+
+# Differences of site and likelihood of being healthy per site
+
+setwd("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian")
+load("fit_brms_2.RData") 
+
+# Only the differences for site
+conditions <- make_conditions(fit_2, vars = c( "Site"))
+# This command takes a while, you can load below
+# ce_Site <- conditional_effects(fit_2,  conditions = conditions, categorical = T, probs = c(0.33, 0.66), method = c("fitted"), re_formula = NULL)
+# save(ce_Site, file="ce_Site.RData")
+
+
+# Load the output from the conditional effects above
+load("ce_Site.RData")
+
+
+# Set levels and colours
+ce_Site$`Depth:cats__`$Status = factor(ce_Site$`Depth:cats__`$Status,levels = c ("Healthy",  "Pale","Bleached","Dead"))
+colours <- c( "forestgreen","green ","orange", "red")
+
+ce_Site$`Depth:cats__`$Site = factor(ce_Site$`Depth:cats__`$Site,levels = c ("Moorea",  "Makatea"))
+
+
+# DElete the  if you consider it is not necessary
+
+islands <- plot(ce_Site, plot = FALSE)[[1]] + scale_color_manual(values= colours,breaks=c("Healthy",  "Pale","Bleached","Dead"))+
+  facet_grid(~ce_Site$`Depth:cats__`$Site, scale = 'free')+
+  scale_fill_manual(values= colours, breaks = c("Healthy",  "Pale","Bleached","Dead"))  + 
+  scale_x_continuous(name ="Depth (m)", limits=c(6,90), breaks = c(6,20,40,60,90)) +
+  scale_y_continuous(name ="Probability ", limits=c(0.00,1.00), breaks = c(0.00,0.25,0.50,0.75,1.00)) +
+  labs(x = "Depth (m)",  y = "Probability",  title = "Bayesian Prediction of Status in Depth per Site") +
+  theme_classic() +  theme(strip.background = element_blank(),axis.text=element_text(size=12),axis.title=element_text(size=14))
+
+ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Figures/islands.pdf", width = 30, height = 20, units = "cm")
+
+
+# Keeping only the probability of being healthy - for each site
+Healthy_Likelihood <-   ce_Site$`Depth:cats__`[ce_Site$`Depth:cats__`[, "cats__"] == "Healthy",]
+
+# Moorea
+Healthy_Likelihood_Moorea  <-  Healthy_Likelihood[Healthy_Likelihood[, "Site"] == "Moorea",]
+Healthy_Likelihood_Moorea <- subset(Healthy_Likelihood_Moorea, select=c("Depth","cats__","effect1__","effect2__","estimate__","se__","lower__","upper__"))
+colnames (Healthy_Likelihood_Moorea) <- c("Depth","cats","effect1","effect2","estimate","se","lower","upper")
+write.csv(Healthy_Likelihood_Moorea, "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood_Moorea.csv")
+
+# Makatea
+Healthy_Likelihood_Makatea  <-  Healthy_Likelihood[Healthy_Likelihood[, "Site"] == "Makatea",]
+Healthy_Likelihood_Makatea <- subset(Healthy_Likelihood_Makatea, select=c("Depth","cats__","effect1__","effect2__","estimate__","se__","lower__","upper__"))
+colnames (Healthy_Likelihood_Makatea) <- c("Depth","cats","effect1","effect2","estimate","se","lower","upper")
+write.csv(Healthy_Likelihood_Makatea, "~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood_Makatea.csv")
+
+
+### Reload dataframes - and all environmental data
+
+# Likelihood healthy
+Healhty_Likelihood_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood_Moorea.csv", sep=",", dec=",")
+Healhty_Likelihood_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood_Makatea.csv", sep=",", dec=",")
+Healthy_Likelihood <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Bayesian/Healthy_Likelihood.csv", sep=",", dec=",")
+
+
+
+# Loggers Temp
+Index_Temp_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MOO1/MOO1_Temp_Index.csv", sep=",", dec=",")
+Index_Temp_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Temperature_Loggers/MAKATEA/MAK1/MAK1_Temp_Index.csv", sep=",", dec=",")
+
+# Loggers light
+Index_Light_Moorea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Moo1/MOO1_Light_Index.csv", sep=",", dec=",")
+Index_Light_Makatea <- read.csv("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Light/Mak1/MAK1_Light_Index.csv", sep=",", dec=",")
+
+
+################## 2 Likelihood healthy vs Temp and Light   ################## 
+
+# First Makatea 
+# Prepare loggers
+# Light
+Index_Light_Makatea$IndexLoss <- as.numeric (Index_Light_Makatea$IndexLoss)
+Light_Index_Loggers <- aggregate (IndexLoss ~  Depth,  Index_Light_Makatea, mean)
+
+Index_Light_Makatea$Mean <- as.numeric (Index_Light_Makatea$Mean)
+Light_Raw_loggers <- aggregate (Mean ~  Depth,  Index_Light_Makatea, mean)
+
+Light_loggers <- merge (Light_Index_Loggers,Light_Raw_loggers, by = "Depth")
+colnames (Light_loggers) <- c("Depth", "Index_Light", "Raw_Light")
+
+
+# Temperature
+Index_Temp_Makatea$Index <- as.numeric (Index_Temp_Makatea$Index)
+Temp_Index_Loggers <- aggregate (Index ~  Depth,  Index_Temp_Makatea, mean)
+
+Index_Temp_Makatea$Mean <- as.numeric (Index_Temp_Makatea$Mean)
+Temp_Raw_loggers <- aggregate (Mean ~  Depth,  Index_Temp_Makatea, mean)
+
+Temp_loggers <- merge (Temp_Index_Loggers,Temp_Raw_loggers, by = "Depth")
+colnames (Temp_loggers) <- c("Depth", "Index_Temp", "Raw_Temp")
+
+# Prepare likelihood of being healthy 
+Healhty_Likelihood_Makatea$Depth <- as.numeric (Healhty_Likelihood_Makatea$Depth)
+Healhty_Likelihood_Makatea$estimate <- as.numeric (Healhty_Likelihood_Makatea$estimate)
+
+# Get values the closest as possible to our loggers depths
+depths <- c(6, 20, 40, 60, 90)
+Likelihood_final <- data.frame ()
+for (k in unique (depths)) {
+  p <- Healhty_Likelihood_Makatea [which(abs(Healhty_Likelihood_Makatea$Depth - k) == min(abs(Healhty_Likelihood_Makatea$Depth - k))), "estimate"]
+  q <- cbind (k, p)
+  Likelihood_final <- rbind (q, Likelihood_final)
+}
+colnames (Likelihood_final) <- c("Depth", "Healthy_Estimate")
+
+# Merge dataframes
+
+Loggers_Makatea <- merge (Light_loggers,Temp_loggers, by = "Depth")
+
+Profiles_vs_Likelihood_Makatea <- merge (Loggers_Makatea,Likelihood_final, by = "Depth")
+
+# Second Moorea 
+# Prepare loggers
+# Light
+Index_Light_Moorea$IndexLoss <- as.numeric (Index_Light_Moorea$IndexLoss)
+Light_Index_Loggers <- aggregate (IndexLoss ~  Depth,  Index_Light_Moorea, mean)
+
+Index_Light_Moorea$Mean <- as.numeric (Index_Light_Moorea$Mean)
+Light_Raw_loggers <- aggregate (Mean ~  Depth,  Index_Light_Moorea, mean)
+
+Light_loggers <- merge (Light_Index_Loggers,Light_Raw_loggers, by = "Depth")
+colnames (Light_loggers) <- c("Depth", "Index_Light", "Raw_Light")
+
+# Temperature
+Index_Temp_Moorea$Index <- as.numeric (Index_Temp_Moorea$Index)
+Temp_Index_Loggers <- aggregate (Index ~  Depth,  Index_Temp_Moorea, mean)
+
+Index_Temp_Moorea$Mean <- as.numeric (Index_Temp_Moorea$Mean)
+Temp_Raw_loggers <- aggregate (Mean ~  Depth,  Index_Temp_Moorea, mean)
+
+Temp_loggers <- merge (Temp_Index_Loggers,Temp_Raw_loggers, by = "Depth")
+colnames (Temp_loggers) <- c("Depth", "Index_Temp", "Raw_Temp")
+
+# Prepare likelihood of being healthy 
+Healhty_Likelihood_Moorea$Depth <- as.numeric (Healhty_Likelihood_Moorea$Depth)
+Healhty_Likelihood_Moorea$estimate <- as.numeric (Healhty_Likelihood_Moorea$estimate)
+
+# Get values the closest as possible to our loggers depths
+depths <- c(6, 20, 40, 60, 90)
+Likelihood_final <- data.frame ()
+for (k in unique (depths)) {
+  p <- Healhty_Likelihood_Moorea [which(abs(Healhty_Likelihood_Moorea$Depth - k) == min(abs(Healhty_Likelihood_Moorea$Depth - k))), "estimate"]
+  q <- cbind (k, p)
+  Likelihood_final <- rbind (q, Likelihood_final)
+}
+colnames (Likelihood_final) <- c("Depth", "Healthy_Estimate")
+
+# Merge dataframes
+
+Loggers_Moorea <- merge (Light_loggers,Temp_loggers, by = "Depth")
+
+Profiles_vs_Likelihood_Moorea <- merge (Loggers_Moorea,Likelihood_final, by = "Depth")
+
+######################## Both islands together ########################
+
+# One single visual plot of likelihood of being healthy with normalised environmental data of both sites. We use index. 
+Profiles_vs_Likelihood_Moorea$Island <- "Moorea"
+Profiles_vs_Likelihood_Makatea$Island <- "Makatea"
+
+# General one
+Profiles_vs_Likelihood <- rbind (Profiles_vs_Likelihood_Moorea,Profiles_vs_Likelihood_Makatea)
+
+
+Profiles_vs_Likelihood$Healthy_Estimate <- Profiles_vs_Likelihood$Healthy_Estimate*100
+
+colours <- c( "blue","green ","red")
+
+likelihood_plot <- ggplot(Profiles_vs_Likelihood, aes (Depth)) +
+  geom_smooth(aes(y = Healthy_Estimate, colour = "green", fill = "green",  span = 0.4, method = "loess")) + 
+  geom_smooth(aes(y = Index_Light, colour = "blue",fill = "blue",  span = 0.4, method = "loess")) +
+  geom_smooth(aes(y = Index_Temp, colour = "red",fill = "red", span = 0.4, method = "loess")) +
+  scale_colour_manual(name="",values=colours) + scale_fill_manual(name="",values=colours) +
+  scale_x_continuous(name ="Depth (m)", limits=c(0,100), breaks = c(6,20,40,60,90)) +
+  scale_y_continuous(name ="Index (%)", limits=c(0,110), breaks = c(0,25,50,75,100)) +
+  theme_classic() + theme(strip.background = element_blank())
+ggsave("~/Documents/AAASea_Science/AAA_PhD_Thesis/Bleaching_2019/Figures/Likelihood_Temp_Light.pdf", width = 12, height = 6, units = "cm")
+likelihood_plot
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
