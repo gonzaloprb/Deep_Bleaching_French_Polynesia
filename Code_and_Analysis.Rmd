@@ -730,6 +730,8 @@ colours <- c( "forestgreen","green ","orange", "red")
 
 resume_site_status_depth$Site = factor(resume_site_status_depth$Site,levels = c ("Moorea",  "Makatea"))
 
+Depth_status <- ddply(resume_site_status_depth, ~  Depth + Status, function(x){c(Proportion_mean = mean(x$Proportion)) })
+
 
 ##### This is one of the used figures
 Islands <- ggplot(resume_site_status_depth, aes(x = factor(Status), y = Proportion, fill = Status)) +
